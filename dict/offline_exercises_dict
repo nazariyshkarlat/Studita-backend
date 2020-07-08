@@ -1,0 +1,12 @@
+[{"type": "exercise", "exercise_type" : 7, "exercise_number" : 84, "exercise_info" : {"title" : "47+2=42"}},
+ {"type": "exercise", "exercise_type" : 8, "exercise_number" : 88, "exercise_info" : {"title" : "6+ ... =56", "subtitle" : "Укажите пропущенное число", "variants" : ["5", "50"]}},
+ {"type": "exercise", "exercise_type" : 6, "exercise_number" : 96, "exercise_info" : {"title" : "22+2=?", "subtitle" : "Какова сумма сложения 22+2?", "variants" : ["222", "22", "24"]}},
+ {"type": "exercise", "exercise_type" : 8, "exercise_number" : 102, "exercise_info" : {"title" : "3+ ... =30", "subtitle" : "Укажите пропущенное число", "variants" : ["0", "27"]}},
+ {"type": "exercise", "exercise_type" : 10, "exercise_number" : 110, "exercise_info" : {"title_parts" : ["20+", "=23"], "subtitle" : "Вставьте пропущенную цифру"}},
+ {"type": "exercise", "exercise_type" : 8, "exercise_number" : 117, "exercise_info" : {"title" : "50+ ... =55", "subtitle" : "Укажите пропущенную цифру", "variants" : ["5", "50"]}},
+ {"type": "exercise", "exercise_type" : 11, "exercise_number" : 122, "exercise_info" : {"title_parts" : ["936", "523", "101"], "filter" : "bigger", "compare_number" : "100"}},
+ {"type": "exercise", "exercise_type" : 8, "exercise_number" : 131, "exercise_info" : {"title" : "198+ ... =1198", "subtitle" : "Укажите пропущенное число", "variants" : ["119", "1000"]}},
+ {"type": "exercise", "exercise_type" : 6, "exercise_number" : 139, "exercise_info" : {"title" : "91+100=?", "subtitle" : "Какова сумма сложения 91+100?", "variants" : ["91100", "191", "91100"]}},
+ {"type": "exercise", "exercise_type" : 10, "exercise_number" : 159, "exercise_info" : {"title_parts" : ["9+", "=59"], "subtitle" : "Вставьте пропущеннуое число"}},
+ {"type": "exercise", "exercise_type" : 8, "exercise_number" : 163, "exercise_info" : {"title": "8+ ... =88", "subtitle" : "Укажите пропущенную цифру", "variants" : ["80", "10"]}},
+ {"type": "exercise", "exercise_type" : 10, "exercise_number" : 169, "exercise_info" : {"title_parts" : ["90+", "=990"], "subtitle" : "Вставьте пропущеннуое число"}}]
