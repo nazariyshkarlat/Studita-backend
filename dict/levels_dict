@@ -1,9 +1,9 @@
-[{"level_number": 1, "children": [{"type" : "chapter", "chapter_number": "1", "title": "Введение в математику", "subtitle": "Будет заполнено", "chapter_parts_count": 8},
-                                  {"type" : "chapter", "chapter_number": "2", "title": "Арифметика", "subtitle": "Будет заполнено", "chapter_parts_count": 0},
+[{"level_number": 1, "children": [{"type" : "chapter", "chapter_number": "1", "title": "Введение в математику", "subtitle": "Понятие чисел, сложение, вычитание.", "chapter_parts_count": 8},
+                                  {"type" : "chapter", "chapter_number": "2", "title": "Арифметика", "subtitle": "Продолжение темы сложения и вычитания. Деление, умножение.", "chapter_parts_count": 0},
                                   {"type" : "interesting", "interesting_number" : "1", "title" : "Угадать загаданное число", "subtitle" : "Этот математический фокус позволяет угадать любое загаданное число с помощью простой формулы", "tags" : ["интересное", "фокус"]}]},
 
- {"level_number": 2, "children": [{"type" : "chapter", "chapter_number": 3, "title": "Основы алгебры", "subtitle": "Будет заполнено", "chapter_parts_count": 0},
-                                  {"type" : "chapter", "chapter_number": 4, "title": "Основы геометрии", "subtitle": "Будет заполнено", "chapter_parts_count": 0}]},
+ {"level_number": 2, "children": [{"type" : "chapter", "chapter_number": 3, "title": "Основы алгебры", "subtitle": "Изучение переменных и их значение. Продолжение темы арифметики.", "chapter_parts_count": 0},
+                                  {"type" : "chapter", "chapter_number": 4, "title": "Основы геометрии", "subtitle": "Изучение прямых, отрезков, лучей, ломанных и прямоугольников.", "chapter_parts_count": 0}]},
 
  {"level_number": 3, "children": [{"type": "subscribe", "title": "100+ новых заданий будут добавлены очень скоро", "button": ["Подписаться на обновления", "Отписаться от обновлений"]},
                                   {"type" : "chapter", "chapter_number": 5, "title": "Алгебра", "subtitle": "Будет заполнено", "chapter_parts_count": 0}]}]

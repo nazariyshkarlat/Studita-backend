@@ -18,6 +18,7 @@ class UserToken(db.Model):
     token_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
     user_token = db.Column(db.String(100), nullable=False)
+    device_id = db.Column(db.String(200), nullable=False)
 
 
 class UserData(db.Model):

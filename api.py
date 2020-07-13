@@ -56,11 +56,6 @@ with open('dict/offline_exercises_dict', 'r', encoding='utf-8') as f:
     offline_exercises_diff = f.read()
     offline_exercises_diff = j.loads(offline_exercises_diff)
 
-message = messaging.Message(data={'type': 'f', 'user_name': "shevtsov", 'user_id': str(2)},
-                            token="dyN38NUXQzOcVg35SIx8Ge:APA91bFa6XhWUIqudzMGnv8HJHKjkWVJGsZk2pyijDYF0QiNxjNyOnwGdvQmXIQojyotme4R3OA0L4dbOXPhHXxFwWc19UF9-rZRopxOrm95px-zfpUxEhXxjlqn4rORIisSL3daPbVD")
-
-messaging.send(message)
-
 unLoggedLevels = copy.deepcopy(levels)
 unLoggedLevels = unLoggedLevels[:2]
 unLoggedLevels[1]["children"].insert(0, {"type": "subscribe",
@@ -344,8 +339,8 @@ def edit_profile():
         return Response(status=400)
 
 
-@app.route('/user_name_available', methods=['GET'])
-def user_name_available():
+@app.route('/is_user_name_available', methods=['GET'])
+def is_user_name_available():
     print(request.headers)
     print(request.data)
     try:
@@ -460,56 +455,16 @@ def sign_in_with_google():
             user_email = idInfo["email"]
             user = db.session.query(User).filter_by(user_email=user_email, user_type='g').first()
             if not user:
-                user = User(user_email=user_email, user_type='g', datetime_added=datetime.utcnow())
-                db.session.add(user)
-                db.session.commit()
-
-                name = user_email.split('@')[0]
-                if "user_data" in json:
-                    user_data = UserData(user_id=user.user_id, user_public_id=uuid.uuid1(), user_name=name,
-                                         avatar_link=idInfo['picture'],
-                                         current_level=json["user_data"]["current_level"],
-                                         current_level_XP=json["user_data"]["current_level_XP"],
-                                         streak_days=json["user_data"]["streak_days"],
-                                         streak_datetime=convert_datetime_str(
-                                             json["user_data"]["streak_datetime"]),
-                                         completed_parts=json["user_data"]["completed_parts"])
-                else:
-                    user_data = UserData(user_id=user.user_id, user_public_id=uuid.uuid1(), user_name=name)
-                db.session.add(user_data)
-                if "user_statistics" in json:
-                    for stat in json['user_statistics']:
-                        stat.update({'user_id': user.user_id})
-                        user_stat = UserStatistics(**stat)
-                        user_stat.datetime = convert_datetime_str(user_stat.datetime)
-                        db.session.add(user_stat)
-
-                privacy_settings = PrivacySettings(user_id=user.user_id)
-                db.session.add(privacy_settings)
-                thread = threading.Thread(target=send_mail.send_mail, args=(user_email,))
-                thread.start()
+                user_data = create_new_user(user_email, None, json)
             else:
-
-                if "push_data" in json:
-                    firebase_token = FirebaseToken(user_id=user.user_id, token=json['push_data']['token'],
-                                                   device_id=json['push_data']['device_id'])
-
-                    db.session.query(FirebaseToken).filter_by(device_id=firebase_token.device_id).delete()
-                    if db.session.query(FirebaseToken).filter_by(user_id=firebase_token.user_id,
-                                                                 token=firebase_token.token,
-                                                                 device_id=firebase_token.device_id).scalar() is None:
-                        db.session.add(firebase_token)
-
                 user_data = db.session.query(UserData).filter_by(user_id=user.user_id).one()
 
-            token = generate_token()
-            new_token = UserToken(user_id=user.user_id, user_token=token)
-
-            db.session.add(new_token)
+            token = create_token(user.user_id, json['push_data']['device_id'])
+            create_firebase_token(user.user_id, json)
 
             db.session.commit()
             return json_200(
-                {**{'user_id': new_token.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
+                {**{'user_id': user.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -527,37 +482,8 @@ def sign_up():
             raise Exception()
         user = db.session.query(User).filter_by(user_email=user_email, user_type='s').first()
         if not user:
-            hash_password = encrypt(user_password)
-            new_user = User(user_email=user_email, user_type='s', datetime_added=datetime.utcnow(),
-                            user_password=hash_password)
-            db.session.add(new_user)
+            create_new_user(user_email, user_password, json)
             db.session.commit()
-
-            name = user_email.split('@')[0]
-            if "user_data" in json:
-                user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=name,
-                                     current_level=json["user_data"]["current_level"],
-                                     current_level_XP=json["user_data"]["current_level_XP"],
-                                     streak_days=json["user_data"]["streak_days"],
-                                     streak_datetime=convert_datetime_str(json["user_data"]["streak_datetime"]),
-                                     completed_parts=json["user_data"]["completed_parts"])
-            else:
-                user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=name)
-            db.session.add(user_data)
-
-            if "user_statistics" in json:
-                for stat in json['user_statistics']:
-                    stat.update({'user_id': new_user.user_id})
-                    user_stat = UserStatistics(**stat)
-                    user_stat.datetime = convert_datetime_str(user_stat.datetime)
-                    db.session.add(user_stat)
-
-            privacy_settings = PrivacySettings(user_id=new_user.user_id)
-            db.session.add(privacy_settings)
-
-            db.session.commit()
-            thread = threading.Thread(target=send_mail.send_mail, args=(user_email,))
-            thread.start()
             return Response(status=200)
         else:
             return Response(status=409)
@@ -579,25 +505,15 @@ def log_in():
         user = db.session.query(User).filter_by(user_email=user_email, user_type='s').first()
         if user:
             if check_bcrypt(user_password, user.user_password):
-                token = generate_token()
-                new_token = UserToken(user_id=user.user_id, user_token=token)
-                db.session.add(new_token)
-                db.session.commit()
-
-                if "push_data" in json:
-                    firebase_token = FirebaseToken(user_id=user.user_id, token=json['push_data']['token'],
-                                                   device_id=json['push_data']['device_id'])
-
-                    db.session.query(FirebaseToken).filter_by(device_id=firebase_token.device_id).delete()
-                    if db.session.query(FirebaseToken).filter_by(user_id=firebase_token.user_id,
-                                                                 token=firebase_token.token,
-                                                                 device_id=firebase_token.device_id).scalar() is None:
-                        db.session.add(firebase_token)
-                        db.session.commit()
 
                 user_data = db.session.query(UserData).filter_by(user_id=user.user_id).one()
+
+                token = create_token(user.user_id, json['push_data']['device_id'])
+                create_firebase_token(user.user_id, json)
+
+                db.session.commit()
                 return json_200(
-                    {**{'user_id': new_token.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
+                    {**{'user_id': user.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
             else:
                 return Response(status=400)
         else:
@@ -611,23 +527,27 @@ def log_in():
 def sign_out():
     print(request.headers)
     print(request.data)
-    try:
-        json = request.get_json()
-        token = check_token(json['auth_data']['user_id'], json['auth_data']['user_token'])
-        firebase_token = db.session.query(FirebaseToken).filter_by(user_id=json['auth_data']['user_id'], device_id=json['device_id']).first()
+    json = request.get_json()
 
-        if firebase_token:
-            db.session.delete(firebase_token)
-            db.session.commit()
+    tokens = db.session.query(UserToken) \
+        .filter(UserToken.device_id == json['device_id']) \
+        .all()
 
-        if token:
-            db.session.delete(token)
-            db.session.commit()
-            return Response(status=200)
-        else:
-            return Response(status=404)
-    except Exception:
-        return Response(status=400)
+    firebase_tokens = db.session.query(FirebaseToken) \
+        .filter(FirebaseToken.device_id == json['device_id']) \
+        .all()
+
+    for firebase_token in firebase_tokens:
+        db.session.delete(firebase_token)
+
+    for token in tokens:
+        db.session.delete(token)
+
+    db.session.commit()
+    if len(firebase_tokens) != 0 and len(tokens) != 0:
+        return Response(status=200)
+    else:
+        return Response(status=404)
 
 
 @app.route('/subscribe_email', methods=['POST'])
@@ -715,11 +635,12 @@ def get_privacy_duels_exceptions_list():
         per_page = int(request.args.get("per_page"))
         page_number = int(request.args.get("page_number"))
         if check_token(user_id, token):
-            friends_ids = list(db.session.query(Friendship.friend_id)
-                               .filter_by(user_id=user_id)
-                               .all())
+
             friends = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
-                .filter(UserData.user_id.in_(friends_ids)) \
+                .group_by(Friendship.user_id, Friendship.friend_id) \
+                .outerjoin(Friendship,
+                           db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id)) \
+                .filter(db.or_(Friendship.user_id == int(user_id), Friendship.friend_id == int(user_id))) \
                 .order_by(db.asc(UserData.user_name)) \
                 .paginate(page_number, per_page, False).items
 
@@ -765,20 +686,22 @@ def get_notifications():
                                              Notification.notification_type,
                                              Notification.datetime_sent) \
                 .filter(UserData.user_id == Notification.id_user_from) \
-                .filter(Notification.user_id == user_id).order_by(db.desc(Notification.datetime_sent)).paginate(page_number, per_page, False).items
+                .filter(Notification.user_id == user_id).order_by(db.desc(Notification.datetime_sent)).paginate(
+                page_number, per_page, False).items
 
-            notifications_dicts = [dict(zip(["user_id", "user_name", "avatar_link", "notification_type"], notification)) for
-                                  notification in
-                                  notifications]
+            notifications_dicts = [dict(zip(["user_id", "user_name", "avatar_link", "notification_type"], notification))
+                                   for
+                                   notification in
+                                   notifications]
 
             for idx, notification in enumerate(notifications):
                 time_diff = datetime.utcnow() - notification.datetime_sent
                 is_my_friend = db.session.query(Friendship).filter(
-                db.or_(db.and_(Friendship.user_id == int(user_id),
-                               Friendship.friend_id == notifications_dicts[idx]['user_id']),
-                       db.and_(Friendship.user_id == notifications_dicts[idx]['user_id'],
-                               Friendship.friend_id == int(
-                                   user_id)))).scalar() is not None if user_id is not None else False
+                    db.or_(db.and_(Friendship.user_id == int(user_id),
+                                   Friendship.friend_id == notifications_dicts[idx]['user_id']),
+                           db.and_(Friendship.user_id == notifications_dicts[idx]['user_id'],
+                                   Friendship.friend_id == int(
+                                       user_id)))).scalar() is not None if user_id is not None else False
 
                 friendship_request = db.session.query(FriendshipRequest).filter(
                     db.or_(db.and_(FriendshipRequest.requesting_id == int(user_id),
@@ -903,20 +826,31 @@ def add_friend():
                 db.session.query(UserData).filter_by(user_id=json['friend_id']).update(
                     dict(notifications_are_checked=False))
 
-                for token_data in firebase_tokens:
-                    content = {'type': 'f', 'user_name': user_data.user_name, 'user_id': str(user_id)}
+                last_friend_notification = db.session.query(Notification).filter_by(user_id=user_id,
+                                                                                    id_user_from=json['friend_id'],
+                                                                                    notification_type="f").order_by(
+                    db.desc(Notification.datetime_sent)).first()
 
-                    if user_data.avatar_link:
-                        content.update({'avatar_link': user_data.avatar_link})
+                hour_from_last_friend_request = (last_friend_notification is None) or (
+                        divmod((notification.datetime_sent - last_friend_notification.datetime_sent).seconds, 3600)[
+                            0] >= 1)
 
-                    try:
-                        message = messaging.Message(data=content,
-                                                    token=token_data.token)
-                        messaging.send(message)
-                    except Exception as e:
-                        db.session.delete(token_data)
+                if hour_from_last_friend_request:
 
-                db.session.add(notification)
+                    for token_data in firebase_tokens:
+                        content = {'type': 'f', 'user_name': user_data.user_name, 'user_id': str(user_id)}
+
+                        if user_data.avatar_link:
+                            content.update({'avatar_link': user_data.avatar_link})
+
+                        try:
+                            message = messaging.Message(data=content,
+                                                        token=token_data.token)
+                            messaging.send(message)
+                        except Exception as e:
+                            db.session.delete(token_data)
+
+                    db.session.add(notification)
                 db.session.add(friendship_request)
                 db.session.commit()
                 return Response(status=200)
@@ -957,7 +891,8 @@ def accept_friendship():
 
                     user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).first()
                     firebase_tokens = db.session.query(FirebaseToken).filter_by(user_id=json['friend_id']).all()
-                    db.session.query(UserData).filter_by(user_id=json['friend_id']).update(dict(notifications_are_checked=False))
+                    db.session.query(UserData).filter_by(user_id=json['friend_id']).update(
+                        dict(notifications_are_checked=False))
 
                     for token_data in firebase_tokens:
                         content = {'type': 'a', 'user_name': user_data.user_name, 'user_id': str(user_id)}
@@ -983,6 +918,20 @@ def accept_friendship():
                 return Response(status=404)
         else:
             return Response(status=404)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
+@app.route('/authentication', methods=['POST'])
+def check_correct_token():
+    print(request.headers)
+    print(request.data)
+    try:
+        json = request.get_json()
+        user_id = json['user_id']
+        token = json['user_token']
+        return Response(str(check_token(user_id, token) is not None).lower(), status=200)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1064,7 +1013,7 @@ def has_friends():
         user_id = int(request.args.get('user_id'))
         friends_count = db.session.query(Friendship).filter(
             db.or_(Friendship.user_id == user_id, Friendship.friend_id == user_id)).count()
-        return str(friends_count != 0).lower()
+        return Response(str(friends_count != 0).lower(), status=200)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1087,15 +1036,21 @@ def get_users():
 
         global_search = friend_of_user_id is None
 
-        users_count = db.session.query(User).count()
+        friends_count = db.session.query(User).count()
+
+        friends_query = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
+            .group_by(Friendship.user_id, Friendship.friend_id) \
+            .outerjoin(Friendship,
+                       db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id)) \
+            .filter(db.or_(Friendship.user_id == int(user_id), Friendship.friend_id == int(user_id)))
 
         if not global_search:
             friends_sort = None
 
-            users_count = db.session.query(Friendship).filter(
+            friends_count = db.session.query(Friendship).filter(
                 db.or_(Friendship.user_id == friend_of_user_id, Friendship.friend_id == friend_of_user_id)).count()
 
-            if users_count == 0:
+            if friends_count == 0:
                 return json_200({'users_count': 0, 'users': []})
 
             if sort == "new_to_old":
@@ -1103,32 +1058,7 @@ def get_users():
             elif sort == "old_to_new":
                 friends_sort = db.asc(Friendship.datetime_added)
 
-            friends_ids = list(db.session.query(Friendship.friend_id, Friendship.user_id)
-                               .filter(
-                db.or_(Friendship.user_id == friend_of_user_id, Friendship.friend_id == friend_of_user_id))
-                               .order_by(friends_sort)
-                               .all())
-
-            friends_ids = [list(element) for element in friends_ids]
-
-            for friendship_ids in friends_ids:
-                for id in friendship_ids:
-                    if id == int(friend_of_user_id if friend_of_user_id else user_id):
-                        friendship_ids.remove(id)
-
-            friends_ids = [tuple(element) for element in friends_ids]
-
-            ordering = db.case(
-                {id: index for index, id in enumerate(friends_ids)},
-                value=UserData.user_id
-            )
-
-            if friends_sort is not None:
-                users = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
-                    .filter(UserData.user_id.in_(friends_ids)) \
-                    .order_by(ordering) \
-                    .paginate(page_number, per_page, False).items
-            else:
+            if friends_sort is None:
 
                 if sort == "A_to_Z":
                     friends_sort = db.asc(UserData.user_name)
@@ -1136,43 +1066,31 @@ def get_users():
                     friends_sort = db.desc(UserData.user_name)
 
                 if friends_sort is not None:
-                    users = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
-                        .filter(UserData.user_id.in_(friends_ids)) \
-                        .order_by(friends_sort) \
-                        .paginate(page_number, per_page, False).items
+                    friends_query = friends_query.order_by(friends_sort)
                 else:
-                    users = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link).filter(
-                        UserData.user_id.in_(friends_ids))
 
                     if starts_with:
                         user_name = starts_with.replace('@', '')
-                        users = users.filter(UserData.user_name.ilike(user_name + '%'))
+                        friends_query = friends_query.filter(UserData.user_name.ilike(user_name + '%'))
 
-                    users = users.paginate(page_number, per_page, False).items
+            users = friends_query.paginate(page_number, per_page, False).items
 
         else:
 
-            friends_ids = list(db.session.query(Friendship.friend_id, Friendship.user_id)
-                               .filter(db.or_(Friendship.user_id == int(user_id), Friendship.friend_id == int(user_id)))
-                               .all())
+            friends_ids_subquery = db.session.query(UserData.user_id) \
+                .outerjoin(Friendship,
+                           db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id)) \
+                .filter(db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id))\
+                .subquery()
 
-            friends_ids = [list(element) for element in friends_ids]
-
-            for friendship_ids in friends_ids:
-                for id in friendship_ids:
-                    if id == int(user_id):
-                        friendship_ids.remove(id)
-
-            friends_ids = [tuple(element) for element in friends_ids]
-
-            users = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link).filter(
-                UserData.user_id.notin_(friends_ids))
+            users_query = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
+                .filter(UserData.user_id.notin_(friends_ids_subquery))
 
             if starts_with:
                 user_name = starts_with.replace('@', '')
-                users = users.filter(UserData.user_name.ilike(user_name + '%'))
+                users_query = users_query.filter(UserData.user_name.ilike(user_name + '%'))
 
-            users = users.paginate(page_number, per_page, False).items
+            users = users_query.paginate(page_number, per_page, False).items
 
         users = [dict(zip(["user_id", "user_name", "avatar_link"], friend)) for friend in
                  users]
@@ -1203,7 +1121,7 @@ def get_users():
 
             user.update(is_my_friend)
 
-        response = {'users_count': users_count, 'users': users}
+        response = {'users_count': friends_count, 'users': users}
         return json_200(response)
     except Exception as e:
         print(e)
@@ -1324,6 +1242,61 @@ def replace_characters(equation):
     return equation
 
 
+def create_new_user(user_email, user_password, unregistered_user_data_json):
+    hash_password = user_password if encrypt(user_password) else None
+    new_user = User(user_email=user_email, user_type='s' if hash_password else 'g', datetime_added=datetime.utcnow(),
+                    user_password=hash_password)
+    db.session.add(new_user)
+    db.session.commit()
+
+    name = user_email.split('@')[0]
+    if "user_data" in unregistered_user_data_json:
+        user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=name,
+                             current_level=unregistered_user_data_json["user_data"]["current_level"],
+                             current_level_XP=unregistered_user_data_json["user_data"]["current_level_XP"],
+                             streak_days=unregistered_user_data_json["user_data"]["streak_days"],
+                             streak_datetime=convert_datetime_str(
+                                 unregistered_user_data_json["user_data"]["streak_datetime"]),
+                             completed_parts=unregistered_user_data_json["user_data"]["completed_parts"])
+    else:
+        user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=name)
+    db.session.add(user_data)
+
+    if "user_statistics" in unregistered_user_data_json:
+        for stat in unregistered_user_data_json['user_statistics']:
+            stat.update({'user_id': new_user.user_id})
+            user_stat = UserStatistics(**stat)
+            user_stat.datetime = convert_datetime_str(user_stat.datetime)
+            db.session.add(user_stat)
+
+    privacy_settings = PrivacySettings(user_id=new_user.user_id)
+    db.session.add(privacy_settings)
+
+    thread = threading.Thread(target=send_mail.send_mail, args=(user_email,))
+    thread.start()
+    return user_data
+
+
+def create_firebase_token(user_id, json):
+    if "push_data" in json:
+        firebase_token = FirebaseToken(user_id=user_id, token=json['push_data']['token'],
+                                       device_id=json['push_data']['device_id'])
+
+        db.session.query(FirebaseToken).filter_by(device_id=firebase_token.device_id).delete()
+        if db.session.query(FirebaseToken).filter_by(user_id=firebase_token.user_id,
+                                                     token=firebase_token.token,
+                                                     device_id=firebase_token.device_id).scalar() is None:
+            db.session.add(firebase_token)
+
+
+def create_token(user_id, device_id):
+    token = generate_token()
+    new_token = UserToken(user_id=user_id, user_token=token, device_id=device_id)
+
+    db.session.add(new_token)
+    return token
+
+
 def get_offline_exercises_list(exercises, offline_exercises_diff):
     offline_exercises = copy.deepcopy(exercises)
     for idx, chapter_part in enumerate(exercises):
@@ -1382,7 +1355,7 @@ CORS(app)
 
 
 def run():
-    app.run(host="0.0.0.0", port=5037)
+    app.run()
 
 
 offline_exercises = get_offline_exercises_list(exercises, offline_exercises_diff)
