@@ -1441,7 +1441,7 @@ CORS(app)
 
 
 def run():
-    app.run(host="0.0.0.0", port=5037)
+    app.run(host="0.0.0.0", port=5000)
 
 
 offline_exercises = get_offline_exercises_list(exercises, offline_exercises_diff)
