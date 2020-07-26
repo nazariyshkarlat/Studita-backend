@@ -286,7 +286,7 @@
                  {"type" : "exercise", "exercise_type" : 15, "exercise_number" : 177, "exercise_info" : {"title" : "6", "subtitle" : "Сумма каких уравнений равна 6?\nВыберите два правильных ответа", "variants" : ["8-4", "3+3", "4+3+4", "2+2+2"]}},
                  {"type" : "exercise", "exercise_type" : 9, "exercise_number" : 178, "exercise_info" : {"title" : "=8"}},
                  {"type" : "exercise", "exercise_type" : 3, "exercise_number" : 179, "exercise_info" : {"title" : ["Плюс", "+"], "subtitle" : "Как называется данный знак?", "variants" : [["Запятая", ","], ["Минус", "-"], ["Плюс", "+"]]}},
-                 {"type" : "exercise", "exercise_type" : 18, "exercise_number" : 180, "exercise_info" : {"title" : "11+3", "subtitle" : "Какова сумма данного уравнения?", "variants" : ["15", "14", "113"]}},
+                 {"type" : "exercise", "exercise_type" : 6, "exercise_number" : 180, "exercise_info" : {"title" : "11+3=?", "subtitle" : "Какова сумма данного уравнения?", "variants" : ["15", "14", "113"]}},
                  {"type" : "exercise", "exercise_type" : 16, "exercise_number" : 181, "exercise_info" : {"title_parts" : ["22", "6=28"], "subtitle" : "Вставьте пропущенный знак"}},
                  {"type" : "exercise", "exercise_type" : 7, "exercise_number" : 182, "exercise_info" : {"title" : "91+3+1=95"}},
                  {"type" : "exercise", "exercise_type" : 5, "exercise_number" : 183, "exercise_info" : {"title" : "9 - это?", "subtitle" : "Сумма какого уравнения равна 9?", "variants" : ["9+1", "7+2", "6+2"]}},

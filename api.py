@@ -62,6 +62,10 @@ unLoggedLevels[1]["children"].insert(0, {"type": "subscribe",
                                          "title": "Войдите, чтобы разблокировать ещё 120 заданий",
                                          "button": ["Войти"]})
 
+message = messaging.Message(data={'type': 'a', 'user_name': "shevtsov", 'user_id': str(2)},
+                            token="fRl2tjMWTHqgXYgcRMiKFp:APA91bH0EfMdPCiFxgjZ6seIybndkvnj-gmR8dl3zpW2gkVOZzbZpS2iCnqXwe0HQ-OeHbK8KP-nRuVyhEXwlzJFKaxM_aye0SCg5DEdNWlos4XKBPXQ_ybaWEsQe1_EIlBmbvp6AMRQ")
+messaging.send(message)
+
 exercises_flatten = []
 for idx, chapter_part in enumerate(exercises):
     for idx1, exercise in enumerate(chapter_part['exercises']):
@@ -234,19 +238,9 @@ def get_exercise(number):
                                   current_exercise['exercise_info']['title_parts'][1].split('=')[0]]
                 equation_result = current_exercise['exercise_info']['title_parts'][1].split('=')[1]
                 true_answer = calc_operators(equation_parts, equation_result)
-                return json_200({'result': 'true'} if answer['answer'] == true_answer
+                return json_200({'result': 'true'} if replace_operators(answer['answer']) == true_answer
                                 else {'result': 'false', 'description': {'description_type': 'text',
                                                                          'description_content': true_answer}})
-            elif current_exercise['exercise_type'] == 18:
-                title_result = eval(current_exercise['exercise_info']['title'])
-                if title_result == eval(answer['answer']):
-                    return json_200({'result': 'true'})
-                else:
-                    for variant in current_exercise['exercise_info']['variants']:
-                        if eval(variant) == title_result:
-                            return json_200({'result': 'false', 'description': {'description_type': 'text',
-                                                                                'description_content':
-                                                                                    variant}})
             elif current_exercise['exercise_type'] == 17:
                 equation_result = str(eval(current_exercise['exercise_info']['title'][1]))
                 return json_200({'result': 'true'} if answer['answer'] == equation_result
@@ -282,7 +276,7 @@ def get_user_data():
         if (today - timedelta(days=1)) > user_data.streak_datetime.date():
             user_data.streak_days = 0
         response = as_dict(user_data)
-        print(response)
+        db.session.commit()
         response.update(
             {"today_completed_exercises": level_utils.get_today_completed_exercises_count(today, user_data, db)})
         return json_200(response)
@@ -402,6 +396,7 @@ def is_user_name_available():
     print(request.headers)
     print(request.data)
     try:
+        t.sleep(0.1)
         return Response(
             str(not db.session.query(UserData).filter_by(user_name=request.args.get('user_name')).scalar()).lower(),
             status=200)
@@ -861,8 +856,8 @@ def edit_privacy_settings():
         return Response(status=400)
 
 
-@app.route('/add_friend', methods=['POST'])
-def add_friend():
+@app.route('/send_friendship', methods=['POST'])
+def send_friendship():
     print(request.headers)
     print(request.data)
     try:
@@ -932,9 +927,9 @@ def accept_friendship():
         token = json['auth_data']['user_token']
         if check_token(user_id, token):
             if db.session.query(Friendship).filter(
-                    db.or_(db.and_(Friendship.user_id == int(user_id), Friendship.friend_id == json['friend_id']),
+                    db.or_(db.and_(Friendship.user_id == user_id, Friendship.friend_id == json['friend_id']),
                            db.and_(Friendship.user_id == json['friend_id'],
-                                   Friendship.friend_id == int(user_id)))).scalar() is None:
+                                   Friendship.friend_id == user_id))).scalar() is None:
 
                 friendship = Friendship(user_id=user_id, friend_id=json['friend_id'], datetime_added=datetime.utcnow())
 
@@ -977,20 +972,6 @@ def accept_friendship():
                 return Response(status=404)
         else:
             return Response(status=404)
-    except Exception as e:
-        print(e)
-        return Response(status=400)
-
-
-@app.route('/authentication', methods=['POST'])
-def check_correct_token():
-    print(request.headers)
-    print(request.data)
-    try:
-        json = request.get_json()
-        user_id = json['user_id']
-        token = json['user_token']
-        return Response(str(check_token(user_id, token) is not None).lower(), status=200)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1043,22 +1024,54 @@ def remove_friend():
                     db.session.delete(duels_exception)
                 db.session.delete(friend)
                 db.session.commit()
+                return Response(status=200)
             else:
-                friendship_request = db.session.query(FriendshipRequest).filter(
-                    db.or_(
-                        db.and_(FriendshipRequest.requesting_id == int(user_id),
-                                FriendshipRequest.recipient_id == json['friend_id']),
-                        db.and_(FriendshipRequest.requesting_id == json['friend_id'],
-                                FriendshipRequest.recipient_id == int(user_id)))).first()
-
-                if friendship_request:
-                    db.session.delete(friendship_request)
-                    db.session.commit()
-                else:
-                    return Response(status=404)
-            return Response(status=200)
+                return Response(status=404)
         else:
             return Response(status=404)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
+@app.route('/cancel_friendship', methods=['POST'])
+def cancel_friendship():
+    print(request.headers)
+    print(request.data)
+    try:
+        json = request.get_json()
+        user_id = json['auth_data']['user_id']
+        token = json['auth_data']['user_token']
+        if check_token(user_id, token):
+            friendship_request = db.session.query(FriendshipRequest).filter(
+                db.or_(
+                    db.and_(FriendshipRequest.requesting_id == int(user_id),
+                            FriendshipRequest.recipient_id == json['friend_id']),
+                    db.and_(FriendshipRequest.requesting_id == json['friend_id'],
+                            FriendshipRequest.recipient_id == int(user_id)))).first()
+
+            if friendship_request:
+                db.session.delete(friendship_request)
+                db.session.commit()
+                return Response(status=200)
+            else:
+                return Response(status=404)
+        else:
+            return Response(status=404)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
+@app.route('/authentication', methods=['POST'])
+def check_correct_token():
+    print(request.headers)
+    print(request.data)
+    try:
+        json = request.get_json()
+        user_id = json['user_id']
+        token = json['user_token']
+        return Response(str(check_token(user_id, token) is not None).lower(), status=200)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1124,13 +1137,14 @@ def get_users():
                 elif sort == "Z_to_A":
                     friends_sort = db.desc(UserData.user_name)
 
-                if friends_sort is not None:
-                    friends_query = friends_query.order_by(friends_sort)
                 else:
 
                     if starts_with:
                         user_name = starts_with.replace('@', '')
-                        friends_query = friends_query.filter(UserData.user_name.ilike(user_name + '%'))
+                        friends_query = friends_query.filter(db.or_(UserData.user_name.ilike(user_name + '%'), UserData.user_full_name.ilike(user_name + '%')))
+
+            if friends_sort is not None:
+                friends_query = friends_query.order_by(friends_sort)
 
             users = friends_query.paginate(page_number, per_page, False).items
 
@@ -1139,7 +1153,8 @@ def get_users():
             friends_ids_subquery = db.session.query(UserData.user_id) \
                 .outerjoin(Friendship,
                            db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id)) \
-                .filter(db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id))\
+                .filter(db.or_(Friendship.user_id == int(user_id), Friendship.friend_id == int(user_id)))\
+                .filter(UserData.user_id != int(user_id))\
                 .subquery()
 
             users_query = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
@@ -1147,7 +1162,8 @@ def get_users():
 
             if starts_with:
                 user_name = starts_with.replace('@', '')
-                users_query = users_query.filter(UserData.user_name.ilike(user_name + '%'))
+                users_query = users_query.filter(
+                    db.or_(UserData.user_name.ilike(user_name + '%'), UserData.user_full_name.ilike(user_name + '%')))
 
             users = users_query.paginate(page_number, per_page, False).items
 
@@ -1182,6 +1198,24 @@ def get_users():
 
         response = {'users_count': friends_count, 'users': users}
         return json_200(response)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
+@app.route('/notifications_are_checked', methods=['POST'])
+def notifications_are_checked():
+    try:
+        json = request.get_json()
+        user_id = json['user_id']
+        token = json['user_token']
+        if check_token(user_id, token):
+            db.session.query(UserData).filter_by(user_id=145).update(
+                dict(notifications_are_checked=True))
+            db.session.commit()
+            return Response(status=200)
+        else:
+            return Response(status=404)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1294,7 +1328,7 @@ def convert_datetime_str(datetimestr):
     return datetime.strptime(datetimestr, '%a, %d %b %Y %H:%M:%S')
 
 
-def replace_characters(equation):
+def replace_operators(equation):
     equation = equation.replace(":", "/")
     equation = equation.replace("÷", "/")
     equation = equation.replace("×", "*")
@@ -1302,7 +1336,7 @@ def replace_characters(equation):
 
 
 def create_new_user(user_email, user_password, unregistered_user_data_json):
-    hash_password = user_password if encrypt(user_password) else None
+    hash_password = encrypt(user_password) if user_password else None
     new_user = User(user_email=user_email, user_type='s' if hash_password else 'g', datetime_added=datetime.utcnow(),
                     user_password=hash_password)
     db.session.add(new_user)
@@ -1428,11 +1462,6 @@ def get_offline_exercises_list(exercises, offline_exercises_diff):
                     elif exercise['exercise_type'] == 17:
                         equation_result = str(eval(exercise['exercise_info']['title'][1]))
                         exercise['answer'] = equation_result
-                    elif exercise['exercise_type'] == 18:
-                        title_result = eval(exercise['exercise_info']['title'])
-                        for variant in exercise['exercise_info']['variants']:
-                            if eval(variant) == title_result:
-                                exercise['answer'] = variant
                 offline_exercises[idx]['exercises'][idx1] = exercise
     return offline_exercises
 
@@ -1441,7 +1470,7 @@ CORS(app)
 
 
 def run():
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5037)
 
 
 offline_exercises = get_offline_exercises_list(exercises, offline_exercises_diff)
