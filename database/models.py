@@ -27,7 +27,7 @@ class UserData(db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     user_public_id = db.Column(db.String(36), nullable=False)
     user_name = db.Column(db.String(25), nullable=False)
-    user_full_name = db.Column(db.String(30), nullable=False)
+    name = db.Column(db.String(30), nullable=False)
     avatar_link = db.Column(db.String(100))
     current_level = db.Column(db.Integer, default=1)
     current_level_XP = db.Column(db.Integer, default=0)

@@ -61,11 +61,6 @@ unLoggedLevels = unLoggedLevels[:2]
 unLoggedLevels[1]["children"].insert(0, {"type": "subscribe",
                                          "title": "Войдите, чтобы разблокировать ещё 120 заданий",
                                          "button": ["Войти"]})
-
-message = messaging.Message(data={'type': 'a', 'user_name': "shevtsov", 'user_id': str(2)},
-                            token="fRl2tjMWTHqgXYgcRMiKFp:APA91bH0EfMdPCiFxgjZ6seIybndkvnj-gmR8dl3zpW2gkVOZzbZpS2iCnqXwe0HQ-OeHbK8KP-nRuVyhEXwlzJFKaxM_aye0SCg5DEdNWlos4XKBPXQ_ybaWEsQe1_EIlBmbvp6AMRQ")
-messaging.send(message)
-
 exercises_flatten = []
 for idx, chapter_part in enumerate(exercises):
     for idx1, exercise in enumerate(chapter_part['exercises']):
@@ -167,8 +162,7 @@ def get_exercise(number):
                 equation_result = eval(equation_parts[0]) == eval(equation_parts[1])
                 return json_200({'result': 'true'} if equation_result == str2bool(answer['answer'])
                                 else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': str(
-                                                                             equation_result).lower()}})
+                                                                         'description_content': str(not str2bool(answer['answer'])).lower()}})
             elif current_exercise['exercise_type'] == 8:
                 parts = current_exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
                 result = solve_x(parts[0] + inverse_number_operator(parts[1]))
@@ -246,6 +240,13 @@ def get_exercise(number):
                 return json_200({'result': 'true'} if answer['answer'] == equation_result
                                 else {'result': 'false', 'description': {'description_type': 'shape',
                                                                          'description_content': [current_exercise['exercise_info']['title'][0], equation_result]}})
+            elif current_exercise['exercise_type'] == 18:
+                title_number = int(current_exercise['exercise_info']['title'])
+                images_count = int(current_exercise['exercise_info']['title_images'][1])
+                statement_is_correct = title_number == images_count
+                return json_200({'result': 'true'} if statement_is_correct == str2bool(answer['answer'])
+                                else {'result': 'false', 'description': {'description_type': 'text',
+                                                                         'description_content': str(not str2bool(answer['answer'])).lower()}})
         except Exception as e:
             print(e)
             return Response(status=400)
@@ -357,8 +358,10 @@ def edit_profile():
         if check_token(user_id, token):
             user_data = db.session.query(UserData).filter_by(user_id=user_id).one()
             if user_utils.user_name_not_exists(db, json['user_data']['user_name'], user_data.user_name):
-                if user_utils.is_valid_edit_profile_data(json['user_data']['user_name'],
-                                                         json['user_data'].get('user_full_name', None)):
+                user_name = json['user_data']['user_name'].strip()
+                name = json['user_data'].get('name', None).strip()
+                print(name)
+                if user_utils.is_valid_edit_profile_data(user_name):
                     if 'avatar' in request.files:
                         file_name = uuid.uuid1().hex
                         file_name = '{0}.jpg'.format(file_name)
@@ -373,11 +376,8 @@ def edit_profile():
                         user_data.avatar_link = "http://37.53.93.223:5037/static/avatars/{0}".format(file_name)
                     else:
                         user_data.avatar_link = json['user_data'].get('avatar_link', None)
-                    if json['user_data']['user_name'].isalnum():
-                        user_data.user_name = json['user_data']['user_name']
-                    else:
-                        return Response(status=400)
-                    user_data.user_full_name = json['user_data'].get('user_full_name', None)
+                    user_data.user_name = user_name
+                    user_data.name = name
                     db.session.commit()
                     return json_200({"avatar_link": user_data.avatar_link})
                 else:
@@ -396,10 +396,13 @@ def is_user_name_available():
     print(request.headers)
     print(request.data)
     try:
-        t.sleep(0.1)
-        return Response(
-            str(not db.session.query(UserData).filter_by(user_name=request.args.get('user_name')).scalar()).lower(),
-            status=200)
+        user_name = request.args.get('user_name').strip()
+        if user_utils.match_user_name(user_name):
+            return Response(
+                str(not db.session.query(UserData).filter_by(user_name=user_name).scalar()).lower(),
+                status=200)
+        else:
+            return Response(status=409)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -891,6 +894,7 @@ def send_friendship():
 
                 if hour_from_last_friend_request:
 
+
                     for token_data in firebase_tokens:
                         content = {'type': 'f', 'user_name': user_data.user_name, 'user_id': str(user_id)}
 
@@ -1141,7 +1145,7 @@ def get_users():
 
                     if starts_with:
                         user_name = starts_with.replace('@', '')
-                        friends_query = friends_query.filter(db.or_(UserData.user_name.ilike(user_name + '%'), UserData.user_full_name.ilike(user_name + '%')))
+                        friends_query = friends_query.filter(db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
 
             if friends_sort is not None:
                 friends_query = friends_query.order_by(friends_sort)
@@ -1163,7 +1167,7 @@ def get_users():
             if starts_with:
                 user_name = starts_with.replace('@', '')
                 users_query = users_query.filter(
-                    db.or_(UserData.user_name.ilike(user_name + '%'), UserData.user_full_name.ilike(user_name + '%')))
+                    db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
 
             users = users_query.paginate(page_number, per_page, False).items
 
@@ -1462,6 +1466,11 @@ def get_offline_exercises_list(exercises, offline_exercises_diff):
                     elif exercise['exercise_type'] == 17:
                         equation_result = str(eval(exercise['exercise_info']['title'][1]))
                         exercise['answer'] = equation_result
+                    elif exercise['exercise_type'] == 18:
+                        title_number = int(exercise['exercise_info']['title'])
+                        images_count = int(exercise['exercise_info']['title_images'][1])
+                        statement_is_correct = title_number == images_count
+                        exercise['answer'] = statement_is_correct
                 offline_exercises[idx]['exercises'][idx1] = exercise
     return offline_exercises
 
@@ -1470,7 +1479,7 @@ CORS(app)
 
 
 def run():
-    app.run(host="0.0.0.0", port=5037)
+    app.run()
 
 
 offline_exercises = get_offline_exercises_list(exercises, offline_exercises_diff)
