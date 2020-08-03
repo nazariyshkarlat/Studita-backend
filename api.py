@@ -118,8 +118,7 @@ def get_exercise(number):
         return number_bounds(number, exercises_flatten)
     elif request.method == 'POST':
         try:
-            array_index = int(number) - 1
-            current_exercise = exercises_flatten[array_index]
+            current_exercise = next((exercise for exercise in exercises_flatten if exercise['exercise_number'] == int(number)), None)
             answer = request.get_json()
             if current_exercise['exercise_type'] == 1:
                 for d in current_exercise['exercise_info']['variants']:
@@ -301,10 +300,14 @@ def complete_exercises():
             chapter_part_number = json['completed_exercises_data']['chapter_part_number']
             obtained_time = json['completed_exercises_data']['obtained_time']
             completed_datetime = convert_datetime_str(json['completed_exercises_data']['datetime'])
+            exercises_bonus_correct_count = json['completed_exercises_data']['exercises_bonus_correct_count']
 
             is_training = user_data.completed_parts[chapter_number - 1] >= chapter_part_number
 
-            obtained_XP = level_utils.get_obtained_XP(user_data, percent, is_training, db, completed_datetime.date())
+            obtained_XP = level_utils.get_obtained_XP(user_data, percent, is_training, db, completed_datetime.date(), exercises_bonus_correct_count)
+
+            print(obtained_XP)
+
             new_levels_count = level_utils.get_new_levels_count(user_data, obtained_XP)
             new_level_XP = level_utils.get_new_level_XP(user_data, obtained_XP)
 
@@ -1404,75 +1407,80 @@ def get_offline_exercises_list(exercises, offline_exercises_diff):
                 if len(replace_item) > 0:
                     exercise = replace_item[0]
 
-                if exercise.get('exercise_number', None):
-                    if exercise['exercise_type'] == 1:
-                        exercise['answer'] = exercise['exercise_info']['title']
-                    elif exercise['exercise_type'] == 2 or exercise['exercise_type'] == 3 or exercise['exercise_type'] == 4:
-                        exercise['answer'] = exercise['exercise_info']['title'][1]
-                    elif exercise['exercise_type'] == 5:
-                        title_number = int(exercise['exercise_info']['title'].split(' ')[0])
-                        for variant in exercise['exercise_info']['variants']:
-                            if eval(variant) == title_number:
-                                exercise['answer'] = variant
-                    elif exercise['exercise_type'] == 6:
-                        exercise['answer'] = str(eval(exercise['exercise_info']['title'].split('=')[0]))
-                    elif exercise['exercise_type'] == 7:
-                        equation_parts = exercise['exercise_info']['title'].split('=')
-                        equation_result = eval(equation_parts[0]) == eval(equation_parts[1])
-                        exercise['answer'] = str(equation_result).lower()
-                    elif exercise['exercise_type'] == 8:
-                        parts = exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
-                        result = solve_x(parts[0] + inverse_number_operator(parts[1]))
-                        exercise['answer'] = str(result)
-                    elif exercise['exercise_type'] == 10:
-                        result = solve_x(
-                            exercise['exercise_info']['title_parts'][0] + 'x' + inverse_number_operator(
-                                exercise['exercise_info']['title_parts'][1].replace('=', '')))
-                        exercise['answer'] = str(result)
-                    elif exercise['exercise_type'] == 11:
-                        int_parts = list(map(int, exercise['exercise_info']['title_parts']))
-                        compare_to_number = int(exercise['exercise_info']['compare_number'])
-                        filter = exercise['exercise_info']['filter']
-                        if filter == "bigger":
-                            result = [x > compare_to_number for x in int_parts]
-                        elif "lower":
-                            result = [x < compare_to_number for x in int_parts]
-                        result = result.count(True)
-                        exercise['answer'] = str(result)
-                    elif exercise['exercise_type'] == 12:
-                        parts = exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
-                        for variant in exercise['exercise_info']['variants']:
-                            result = eval(parts[0].replace('x', variant))
-                            if result == int(parts[1]):
-                                exercise['answer'] = variant
-                    elif exercise['exercise_type'] == 13:
-                        exercise['answer'] = str(eval(exercise['exercise_info']['title'][1]))
-                    elif exercise['exercise_type'] == 14:
-                        title_number = int(exercise['exercise_info']['title'][1])
-                        for variant in exercise['exercise_info']['variants']:
-                            if eval(variant) == title_number:
-                                exercise['answer'] = variant
-                    elif exercise['exercise_type'] == 15:
-                        title_number = int(exercise['exercise_info']['title'])
-                        true_answers = []
-                        for variant in exercise['exercise_info']['variants']:
-                            if eval(variant) == title_number:
-                                true_answers.append(variant)
-                        exercise['answer'] = ','.join(true_answers)
-                    elif exercise['exercise_type'] == 16:
-                        equation_parts = [exercise['exercise_info']['title_parts'][0], exercise['exercise_info']['title_parts'][1].split('=')[0]]
-                        equation_result = exercise['exercise_info']['title_parts'][1].split('=')[1]
-                        exercise['answer'] = calc_operators(equation_parts, equation_result)
-                    elif exercise['exercise_type'] == 17:
-                        equation_result = str(eval(exercise['exercise_info']['title'][1]))
-                        exercise['answer'] = equation_result
-                    elif exercise['exercise_type'] == 18:
-                        title_number = int(exercise['exercise_info']['title'])
-                        images_count = int(exercise['exercise_info']['title_images'][1])
-                        statement_is_correct = title_number == images_count
-                        exercise['answer'] = statement_is_correct
+                compute_exercise_answer(exercise)
                 offline_exercises[idx]['exercises'][idx1] = exercise
     return offline_exercises
+
+
+def compute_exercise_answer(exercise):
+    if exercise.get('exercise_number', None):
+        if exercise['exercise_type'] == 1:
+            exercise['answer'] = exercise['exercise_info']['title']
+        elif exercise['exercise_type'] == 2 or exercise['exercise_type'] == 3 or exercise['exercise_type'] == 4:
+            exercise['answer'] = exercise['exercise_info']['title'][1]
+        elif exercise['exercise_type'] == 5:
+            title_number = int(exercise['exercise_info']['title'].split(' ')[0])
+            for variant in exercise['exercise_info']['variants']:
+                if eval(variant) == title_number:
+                    exercise['answer'] = variant
+        elif exercise['exercise_type'] == 6:
+            exercise['answer'] = str(eval(exercise['exercise_info']['title'].split('=')[0]))
+        elif exercise['exercise_type'] == 7:
+            equation_parts = exercise['exercise_info']['title'].split('=')
+            equation_result = eval(equation_parts[0]) == eval(equation_parts[1])
+            exercise['answer'] = str(equation_result).lower()
+        elif exercise['exercise_type'] == 8:
+            parts = exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
+            result = solve_x(parts[0] + inverse_number_operator(parts[1]))
+            exercise['answer'] = str(result)
+        elif exercise['exercise_type'] == 10:
+            result = solve_x(
+                exercise['exercise_info']['title_parts'][0] + 'x' + inverse_number_operator(
+                    exercise['exercise_info']['title_parts'][1].replace('=', '')))
+            exercise['answer'] = str(result)
+        elif exercise['exercise_type'] == 11:
+            int_parts = list(map(int, exercise['exercise_info']['title_parts']))
+            compare_to_number = int(exercise['exercise_info']['compare_number'])
+            filter = exercise['exercise_info']['filter']
+            if filter == "bigger":
+                result = [x > compare_to_number for x in int_parts]
+            elif "lower":
+                result = [x < compare_to_number for x in int_parts]
+            result = result.count(True)
+            exercise['answer'] = str(result)
+        elif exercise['exercise_type'] == 12:
+            parts = exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
+            for variant in exercise['exercise_info']['variants']:
+                result = eval(parts[0].replace('x', variant))
+                if result == int(parts[1]):
+                    exercise['answer'] = variant
+        elif exercise['exercise_type'] == 13:
+            exercise['answer'] = str(eval(exercise['exercise_info']['title'][1]))
+        elif exercise['exercise_type'] == 14:
+            title_number = int(exercise['exercise_info']['title'][1])
+            for variant in exercise['exercise_info']['variants']:
+                if eval(variant) == title_number:
+                    exercise['answer'] = variant
+        elif exercise['exercise_type'] == 15:
+            title_number = int(exercise['exercise_info']['title'])
+            true_answers = []
+            for variant in exercise['exercise_info']['variants']:
+                if eval(variant) == title_number:
+                    true_answers.append(variant)
+            exercise['answer'] = ','.join(true_answers)
+        elif exercise['exercise_type'] == 16:
+            equation_parts = [exercise['exercise_info']['title_parts'][0],
+                              exercise['exercise_info']['title_parts'][1].split('=')[0]]
+            equation_result = exercise['exercise_info']['title_parts'][1].split('=')[1]
+            exercise['answer'] = calc_operators(equation_parts, equation_result)
+        elif exercise['exercise_type'] == 17:
+            equation_result = str(eval(exercise['exercise_info']['title'][1]))
+            exercise['answer'] = equation_result
+        elif exercise['exercise_type'] == 18:
+            title_number = int(exercise['exercise_info']['title'])
+            images_count = int(exercise['exercise_info']['title_images'][1])
+            statement_is_correct = title_number == images_count
+            exercise['answer'] = statement_is_correct
 
 
 CORS(app)
@@ -1481,6 +1489,10 @@ CORS(app)
 def run():
     app.run()
 
+
+for exercise in exercises_flatten:
+    if exercise.get('is_bonus'):
+        compute_exercise_answer(exercise)
 
 offline_exercises = get_offline_exercises_list(exercises, offline_exercises_diff)
 
