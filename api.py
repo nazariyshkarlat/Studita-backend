@@ -109,7 +109,6 @@ def get_offline_exercises():
     print(request.data)
     return json_200(offline_exercises)
 
-
 @app.route('/exercises/<number>', methods=['GET', 'POST'])
 def get_exercise(number):
     print(request.headers)
