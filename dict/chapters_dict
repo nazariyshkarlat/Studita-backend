@@ -5,11 +5,11 @@
                                                                       {"part_number" : 5, "name" : "Числа от 10 до 99 (ч. 2)"},
                                                                       {"part_number" : 6, "name" : "Закрепление материала"},
                                                                       {"part_number" : 7, "name" : "Числа от 100 и выше"},
-                                                                      {"part_number" : 8, "name" : "Закрепление всей темы"}]},
+                                                                      {"part_number" : 8, "name" : "Закрепление всей темы"}], "exercises_count" : 219},
  {"chapter_number" : 2, "title" : "Арифметика", "parts" : [{"part_number" : 9, "name" : "Базовое сложение"},
                                                            {"part_number" : 10, "name" : "Базовое вычитание"},
                                                            {"part_number" : 11, "name" : "Закрепление сложения и вычитания"},
                                                            {"part_number" : 12, "name" : "Базовое умножение"},
                                                            {"part_number" : 13, "name" : "Базовое деление"},
                                                            {"part_number" : 14, "name" : "Закрепление умножения и деления"},
-                                                           {"part_number" : 15, "name" : "Закрепление всей темы"}]}]
+                                                           {"part_number" : 15, "name" : "Закрепление всей темы"}], "exercises_count" : 208}]

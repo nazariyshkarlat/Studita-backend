@@ -109,6 +109,7 @@ def get_offline_exercises():
     print(request.data)
     return json_200(offline_exercises)
 
+
 @app.route('/exercises/<number>', methods=['GET', 'POST'])
 def get_exercise(number):
     print(request.headers)
@@ -117,68 +118,78 @@ def get_exercise(number):
         return number_bounds(number, exercises_flatten)
     elif request.method == 'POST':
         try:
-            current_exercise = next((exercise for exercise in exercises_flatten if exercise['exercise_number'] == int(number)), None)
+            current_exercise = next(
+                (exercise for exercise in exercises_flatten if exercise['exercise_number'] == int(number)), None)
             answer = request.get_json()
             if current_exercise['exercise_type'] == 1:
-                for d in current_exercise['exercise_info']['variants']:
-                    if current_exercise['exercise_info']['title'] in d:
-                        correct_answer = d
-                return json_200({'result': 'true'} if current_exercise['exercise_info']['title'] == answer['answer']
-                                else {'result': 'false', 'description': {'description_type': 'shape',
-                                                                         'description_content': correct_answer}})
-            elif current_exercise['exercise_type'] == 2 or current_exercise['exercise_type'] == 4:
-                return json_200({'result': 'true'} if current_exercise['exercise_info']['title'][1] == answer['answer']
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content':
-                                                                             current_exercise['exercise_info']['title'][
-                                                                                 1]}})
+                if current_exercise['exercise_info']['title'] == answer['answer']:
+                    return json_200({'result': True})
+                else:
+                    for d in current_exercise['exercise_info']['variants']:
+                        if current_exercise['exercise_info']['title'] in d:
+                            correct_answer = d
+                            return json_200({'result': False, 'description': {'description_type': 'shape',
+                                                                              'description_content':
+                                                                                  correct_answer}})
+            elif current_exercise['exercise_type'] == 2:
+                return json_200({'result': True} if current_exercise['exercise_info']['title'][1] == answer['answer']
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content':
+                                                                           current_exercise['exercise_info']['title'][
+                                                                               1]}})
             elif current_exercise['exercise_type'] == 3:
-                return json_200({'result': 'true'} if current_exercise['exercise_info']['title'][1] == answer['answer']
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content':
-                                                                             current_exercise['exercise_info']['title'][
-                                                                                 0]}})
+                return json_200({'result': True} if current_exercise['exercise_info']['title'][0] == answer['answer']
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content':
+                                                                           current_exercise['exercise_info']['title'][
+                                                                               0]}})
+            elif current_exercise['exercise_type'] == 4:
+                return json_200({'result': True} if current_exercise['exercise_info']['title'][1] == answer['answer']
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content':
+                                                                           current_exercise['exercise_info']['title'][
+                                                                               1]}})
             elif current_exercise['exercise_type'] == 5:
                 title_number = int(current_exercise['exercise_info']['title'].split(' ')[0])
-                if title_number == eval(answer['answer']):
-                    return json_200({'result': 'true'})
+                if title_number == eval_with_replace(answer['answer']):
+                    return json_200({'result': True})
                 else:
                     for variant in current_exercise['exercise_info']['variants']:
-                        if eval(variant) == title_number:
-                            return json_200({'result': 'false', 'description': {'description_type': 'text',
-                                                                                'description_content':
-                                                                                    variant}})
+                        if eval_with_replace(variant) == title_number:
+                            return json_200({'result': False, 'description': {'description_type': 'text',
+                                                                              'description_content':
+                                                                                  variant}})
             elif current_exercise['exercise_type'] == 6:
-                title_result = eval(current_exercise['exercise_info']['title'].split('=')[0])
-                print(current_exercise['exercise_info']['title'].split('=')[0])
-                return json_200({'result': 'true'} if title_result == int(answer['answer'])
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content':
-                                                                             str(title_result)}})
+                title_result = eval_with_replace(current_exercise['exercise_info']['title'].split('=')[0])
+                return json_200({'result': True} if title_result == int(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content':
+                                                                           str(title_result)}})
             elif current_exercise['exercise_type'] == 7:
                 equation_parts = current_exercise['exercise_info']['title'].split('=')
-                equation_result = eval(equation_parts[0]) == eval(equation_parts[1])
-                return json_200({'result': 'true'} if equation_result == str2bool(answer['answer'])
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': str(not str2bool(answer['answer'])).lower()}})
+                equation_result = eval_with_replace(equation_parts[0]) == eval_with_replace(equation_parts[1])
+                return json_200({'result': True} if equation_result == str2bool(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': str(
+                                                                           not str2bool(answer['answer'])).lower()}})
             elif current_exercise['exercise_type'] == 8:
                 parts = current_exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
                 result = solve_x(parts[0] + inverse_number_operator(parts[1]))
-                return json_200({'result': 'true'} if result == int(answer['answer'])
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': str(result)}})
+                return json_200({'result': True} if result == int(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': str(result)}})
             elif current_exercise['exercise_type'] == 9:
-                answer_result = eval(answer['answer'])
-                return json_200({'result': 'true'} if answer_result == int(
+                answer_result = eval_with_replace(answer['answer'])
+                return json_200({'result': True} if answer_result == int(
                     current_exercise['exercise_info']['title'].replace('=', ''))
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': str(answer_result)}})
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': str(answer_result)}})
             elif current_exercise['exercise_type'] == 10:
                 result = solve_x(current_exercise['exercise_info']['title_parts'][0] + 'x' + inverse_number_operator(
                     current_exercise['exercise_info']['title_parts'][1].replace('=', '')))
-                return json_200({'result': 'true'} if result == int(answer['answer'])
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': str(result)}})
+                return json_200({'result': True} if result == int(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': str(result)}})
             elif current_exercise['exercise_type'] == 11:
                 int_parts = list(map(int, current_exercise['exercise_info']['title_parts']))
                 compare_to_number = int(current_exercise['exercise_info']['compare_number'])
@@ -188,63 +199,122 @@ def get_exercise(number):
                 elif "lower":
                     result = [x < compare_to_number for x in int_parts]
                 result = result.count(True)
-                return json_200({'result': 'true'} if result == int(answer['answer'])
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': str(result)}})
+                return json_200({'result': True} if result == int(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': str(result)}})
             elif current_exercise['exercise_type'] == 12:
                 parts = current_exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
-                for variant in current_exercise['exercise_info']['variants']:
-                    if eval(parts[0].replace('x', variant)) == int(parts[1]):
-                        true_variant = variant
-                result = eval(parts[0].replace('x', answer['answer']))
-                return json_200({'result': 'true'} if result == int(parts[1])
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': true_variant}})
-            elif current_exercise['exercise_type'] == 13:
-                true_answer = str(eval(current_exercise['exercise_info']['title'][1]))
-                return json_200({'result': 'true'} if answer['answer'] == true_answer
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': true_answer}})
-            elif current_exercise['exercise_type'] == 14:
-                title_number = int(current_exercise['exercise_info']['title'][1])
-                if title_number == eval(answer['answer']):
-                    return json_200({'result': 'true'})
+                print(parts)
+                result = eval_with_replace(parts[0].replace('x', answer['answer']))
+                if result == int(parts[1]):
+                    return json_200({'result': True})
                 else:
                     for variant in current_exercise['exercise_info']['variants']:
-                        if eval(variant) == title_number:
-                            return json_200({'result': 'false', 'description': {'description_type': 'text',
-                                                                                'description_content':
-                                                                                    variant}})
+                        if eval_with_replace(parts[0].replace('x', variant)) == int(parts[1]):
+                            true_variant = variant
+                            return json_200({'result': False, 'description': {'description_type': 'text',
+                                                                              'description_content':
+                                                                                  true_variant}})
+            elif current_exercise['exercise_type'] == 13:
+                true_answer = str(eval_with_replace(current_exercise['exercise_info']['title'][1]))
+                return json_200({'result': True} if answer['answer'] == true_answer
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': true_answer}})
+            elif current_exercise['exercise_type'] == 14:
+                title_number = int(current_exercise['exercise_info']['title'][1])
+                if title_number == eval_with_replace(answer['answer']):
+                    return json_200({'result': True})
+                else:
+                    for variant in current_exercise['exercise_info']['variants']:
+                        if eval_with_replace(variant) == title_number:
+                            return json_200({'result': False, 'description': {'description_type': 'text',
+                                                                              'description_content':
+                                                                                  variant}})
             elif current_exercise['exercise_type'] == 15:
                 title_number = int(current_exercise['exercise_info']['title'])
                 true_answers = []
                 for variant in current_exercise['exercise_info']['variants']:
-                    if eval(variant) == title_number:
+                    if eval_with_replace(variant) == title_number:
                         true_answers.append(variant)
                 answers = answer['answer'].split(',')
-                return json_200({'result': 'true'} if set(answers) == set(true_answers)
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': ','.join(true_answers)}})
+                return json_200({'result': True} if set(answers) == set(true_answers)
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': ','.join(true_answers)}})
             elif current_exercise['exercise_type'] == 16:
                 equation_parts = [current_exercise['exercise_info']['title_parts'][0],
                                   current_exercise['exercise_info']['title_parts'][1].split('=')[0]]
                 equation_result = current_exercise['exercise_info']['title_parts'][1].split('=')[1]
                 true_answer = calc_operators(equation_parts, equation_result)
-                return json_200({'result': 'true'} if replace_operators(answer['answer']) == true_answer
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': true_answer}})
+                return json_200({'result': True} if replace_operators(answer['answer']) == replace_operators(true_answer)
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': true_answer}})
             elif current_exercise['exercise_type'] == 17:
-                equation_result = str(eval(current_exercise['exercise_info']['title'][1]))
-                return json_200({'result': 'true'} if answer['answer'] == equation_result
-                                else {'result': 'false', 'description': {'description_type': 'shape',
-                                                                         'description_content': [current_exercise['exercise_info']['title'][0], equation_result]}})
+                equation_result = str(eval_with_replace(current_exercise['exercise_info']['title'][1]))
+                return json_200({'result': True} if answer['answer'] == equation_result
+                                else {'result': False, 'description': {'description_type': 'shape',
+                                                                       'description_content': [
+                                                                           current_exercise['exercise_info']['title'][
+                                                                               0], equation_result]}})
             elif current_exercise['exercise_type'] == 18:
                 title_number = int(current_exercise['exercise_info']['title'])
                 images_count = int(current_exercise['exercise_info']['title_images'][1])
                 statement_is_correct = title_number == images_count
-                return json_200({'result': 'true'} if statement_is_correct == str2bool(answer['answer'])
-                                else {'result': 'false', 'description': {'description_type': 'text',
-                                                                         'description_content': str(not str2bool(answer['answer'])).lower()}})
+                return json_200({'result': True} if statement_is_correct == str2bool(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': str(
+                                                                           not str2bool(answer['answer'])).lower()}})
+            elif current_exercise['exercise_type'] == 20:
+                title_text_number = int(current_exercise['exercise_info']['title'][0][1])
+                title_number = int(current_exercise['exercise_info']['title'][1][0])
+                statement_is_correct = title_text_number == title_number
+                return json_200({'result': True} if statement_is_correct == str2bool(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': str(
+                                                                           not str2bool(answer['answer'])).lower()}})
+            elif current_exercise['exercise_type'] == 21:
+                title_number = int(current_exercise['exercise_info']['title'][1])
+                if title_number == int(answer['answer']):
+                    return json_200({'result': True})
+                else:
+                    for variant in current_exercise['exercise_info']['variants']:
+                        if int(variant[1]) == title_number:
+                            return json_200({'result': False, 'description': {'description_type': 'text',
+                                                                              'description_content':
+                                                                                  variant[1]}})
+
+            elif current_exercise['exercise_type'] == 23:
+                equation_parts = [current_exercise['exercise_info']['title_parts'][0],
+                                  current_exercise['exercise_info']['title_parts'][1].split('=')[0]]
+                equation_result = current_exercise['exercise_info']['title_parts'][1].split('=')[1]
+                true_answer = calc_operators(equation_parts, equation_result)
+                return json_200({'result': True} if replace_operators(answer['answer']) == true_answer
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content': true_answer}})
+            elif current_exercise['exercise_type'] == 24:
+                title_equation_result = eval_with_replace(current_exercise['exercise_info']['title'])
+                if title_equation_result == eval_with_replace(answer['answer']):
+                    return json_200({'result': True})
+                else:
+                    for variant in current_exercise['exercise_info']['variants']:
+                        if eval_with_replace(variant) == title_equation_result:
+                            return json_200({'result': False, 'description': {'description_type': 'text',
+                                                                              'description_content':
+                                                                                  variant}})
+            elif current_exercise['exercise_type'] == 25:
+                if current_exercise['exercise_info']['subtitle'][0] == answer['answer']:
+                    return json_200({'result': True})
+                else:
+                    for variant in current_exercise['exercise_info']['variants']:
+                        if variant[0] == current_exercise['exercise_info']['subtitle'][0]:
+                            return json_200({'result': False, 'description': {'description_type': 'text',
+                                                                              'description_content':
+                                                                                  variant[1]}})
+            elif current_exercise['exercise_type'] == 26:
+                title_result = eval_with_replace(current_exercise['exercise_info']['title'].split('=')[0])
+                return json_200({'result': True} if title_result == int(answer['answer'])
+                                else {'result': False, 'description': {'description_type': 'text',
+                                                                       'description_content':
+                                                                           str(title_result)}})
         except Exception as e:
             print(e)
             return Response(status=400)
@@ -296,24 +366,24 @@ def complete_exercises():
             user_data = db.session.query(UserData).filter_by(user_id=user_id).one()
             percent = json['completed_exercises_data']['percent']
             chapter_number = json['completed_exercises_data']['chapter_number']
-            chapter_part_number = json['completed_exercises_data']['chapter_part_number']
+            chapter_part_in_chapter_number = json['completed_exercises_data']['chapter_part_in_chapter_number']
             obtained_time = json['completed_exercises_data']['obtained_time']
             completed_datetime = convert_datetime_str(json['completed_exercises_data']['datetime'])
             exercises_bonus_correct_count = json['completed_exercises_data']['exercises_bonus_correct_count']
 
-            is_training = user_data.completed_parts[chapter_number - 1] >= chapter_part_number
+            is_training = user_data.completed_parts[chapter_number - 1] >= chapter_part_in_chapter_number
 
-            obtained_XP = level_utils.get_obtained_XP(user_data, percent, is_training, db, completed_datetime.date(), exercises_bonus_correct_count)
-
-            print(obtained_XP)
+            obtained_XP = level_utils.get_obtained_XP(user_data, percent, is_training, db, completed_datetime.date(),
+                                                      exercises_bonus_correct_count)
 
             new_levels_count = level_utils.get_new_levels_count(user_data, obtained_XP)
             new_level_XP = level_utils.get_new_level_XP(user_data, obtained_XP)
 
             if not is_training:
                 new_completed_parts = user_data.completed_parts.copy()
-                new_completed_parts[chapter_number - 1] += 1
-                user_data.completed_parts = new_completed_parts
+                if new_completed_parts[chapter_number - 1] + 1 == chapter_part_in_chapter_number:
+                    new_completed_parts[chapter_number - 1] += 1
+                    user_data.completed_parts = new_completed_parts
 
             user_data.current_level = UserData.current_level + new_levels_count
             user_data.current_level_XP = new_level_XP
@@ -404,7 +474,7 @@ def is_user_name_available():
                 str(not db.session.query(UserData).filter_by(user_name=user_name).scalar()).lower(),
                 status=200)
         else:
-            return Response(status=409)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -517,12 +587,12 @@ def sign_in_with_google():
             else:
                 user_data = db.session.query(UserData).filter_by(user_id=user.user_id).one()
 
-            token = create_token(user.user_id, json['push_data']['device_id'])
-            create_firebase_token(user.user_id, json)
+            token = create_token(user_data.user_id, json['push_data']['device_id'])
+            create_firebase_token(user_data.user_id, json)
 
             db.session.commit()
             return json_200(
-                {**{'user_id': user.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
+                {**{'user_id': user_data.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -896,7 +966,6 @@ def send_friendship():
 
                 if hour_from_last_friend_request:
 
-
                     for token_data in firebase_tokens:
                         content = {'type': 'f', 'user_name': user_data.user_name, 'user_id': str(user_id)}
 
@@ -1122,7 +1191,8 @@ def get_users():
             friends_query = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
                 .outerjoin(Friendship,
                            db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id)) \
-                .filter(db.or_(Friendship.user_id == int(friend_of_user_id if friend_of_user_id else user_id), Friendship.friend_id == int(friend_of_user_id if friend_of_user_id else user_id)))\
+                .filter(db.or_(Friendship.user_id == int(friend_of_user_id if friend_of_user_id else user_id),
+                               Friendship.friend_id == int(friend_of_user_id if friend_of_user_id else user_id))) \
                 .filter(UserData.user_id != int(friend_of_user_id if friend_of_user_id else user_id))
 
             friends_count = db.session.query(Friendship).filter(
@@ -1147,7 +1217,8 @@ def get_users():
 
                     if starts_with:
                         user_name = starts_with.replace('@', '')
-                        friends_query = friends_query.filter(db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
+                        friends_query = friends_query.filter(
+                            db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
 
             if friends_sort is not None:
                 friends_query = friends_query.order_by(friends_sort)
@@ -1159,8 +1230,8 @@ def get_users():
             friends_ids_subquery = db.session.query(UserData.user_id) \
                 .outerjoin(Friendship,
                            db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id)) \
-                .filter(db.or_(Friendship.user_id == int(user_id), Friendship.friend_id == int(user_id)))\
-                .filter(UserData.user_id != int(user_id))\
+                .filter(db.or_(Friendship.user_id == int(user_id), Friendship.friend_id == int(user_id))) \
+                .filter(UserData.user_id != int(user_id)) \
                 .subquery()
 
             users_query = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
@@ -1295,10 +1366,14 @@ def str2bool(v):
 
 
 def calc_operators(components, result):
-    operators = ['-', '+', '/', '*']
+    operators = ['-', '+', '÷', '×']
     for operator in operators:
-        if eval(components[0] + operator + components[1]) == int(result):
+        if eval_with_replace(components[0] + operator + components[1]) == int(result):
             return operator
+        
+
+def eval_with_replace(equation, round_to_int=True):
+    return int(eval(replace_operators(equation))) if round_to_int else eval(replace_operators(equation))
 
 
 def inverse_number_operator(number):
@@ -1309,6 +1384,7 @@ def inverse_number_operator(number):
 
 
 def solve_x(equation):
+    equation = replace_operators(equation)
     x = Symbol('x')
     return solve(equation, x)[0]
 
@@ -1415,18 +1491,21 @@ def compute_exercise_answer(exercise):
     if exercise.get('exercise_number', None):
         if exercise['exercise_type'] == 1:
             exercise['answer'] = exercise['exercise_info']['title']
-        elif exercise['exercise_type'] == 2 or exercise['exercise_type'] == 3 or exercise['exercise_type'] == 4:
+        elif exercise['exercise_type'] == 2 or exercise['exercise_type'] == 4:
             exercise['answer'] = exercise['exercise_info']['title'][1]
+        elif exercise['exercise_type'] == 3:
+            exercise['answer'] = exercise['exercise_info']['title'][0]
         elif exercise['exercise_type'] == 5:
             title_number = int(exercise['exercise_info']['title'].split(' ')[0])
             for variant in exercise['exercise_info']['variants']:
-                if eval(variant) == title_number:
+                if eval_with_replace(variant) == title_number:
                     exercise['answer'] = variant
+                    return
         elif exercise['exercise_type'] == 6:
-            exercise['answer'] = str(eval(exercise['exercise_info']['title'].split('=')[0]))
+            exercise['answer'] = str(eval_with_replace(exercise['exercise_info']['title'].split('=')[0]))
         elif exercise['exercise_type'] == 7:
             equation_parts = exercise['exercise_info']['title'].split('=')
-            equation_result = eval(equation_parts[0]) == eval(equation_parts[1])
+            equation_result = eval_with_replace(equation_parts[0]) == eval_with_replace(equation_parts[1])
             exercise['answer'] = str(equation_result).lower()
         elif exercise['exercise_type'] == 8:
             parts = exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
@@ -1450,43 +1529,73 @@ def compute_exercise_answer(exercise):
         elif exercise['exercise_type'] == 12:
             parts = exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
             for variant in exercise['exercise_info']['variants']:
-                result = eval(parts[0].replace('x', variant))
+                result = eval_with_replace(parts[0].replace('x', variant))
                 if result == int(parts[1]):
                     exercise['answer'] = variant
+                    return
         elif exercise['exercise_type'] == 13:
-            exercise['answer'] = str(eval(exercise['exercise_info']['title'][1]))
+            exercise['answer'] = str(eval_with_replace(exercise['exercise_info']['title'][1]))
         elif exercise['exercise_type'] == 14:
             title_number = int(exercise['exercise_info']['title'][1])
             for variant in exercise['exercise_info']['variants']:
-                if eval(variant) == title_number:
+                if eval_with_replace(variant) == title_number:
                     exercise['answer'] = variant
+                    return
         elif exercise['exercise_type'] == 15:
             title_number = int(exercise['exercise_info']['title'])
             true_answers = []
             for variant in exercise['exercise_info']['variants']:
-                if eval(variant) == title_number:
+                if eval_with_replace(variant) == title_number:
                     true_answers.append(variant)
             exercise['answer'] = ','.join(true_answers)
-        elif exercise['exercise_type'] == 16:
+        elif exercise['exercise_type'] == 16 or exercise['exercise_type'] == 23:
             equation_parts = [exercise['exercise_info']['title_parts'][0],
                               exercise['exercise_info']['title_parts'][1].split('=')[0]]
             equation_result = exercise['exercise_info']['title_parts'][1].split('=')[1]
             exercise['answer'] = calc_operators(equation_parts, equation_result)
         elif exercise['exercise_type'] == 17:
-            equation_result = str(eval(exercise['exercise_info']['title'][1]))
+            equation_result = str(eval_with_replace(exercise['exercise_info']['title'][1]))
             exercise['answer'] = equation_result
         elif exercise['exercise_type'] == 18:
             title_number = int(exercise['exercise_info']['title'])
             images_count = int(exercise['exercise_info']['title_images'][1])
             statement_is_correct = title_number == images_count
             exercise['answer'] = statement_is_correct
+        elif exercise['exercise_type'] == 20:
+            title_text_number = int(exercise['exercise_info']['title'][0][1])
+            title_number = int(exercise['exercise_info']['title'][1][0])
+            exercise['answer'] = title_text_number == title_number
+        elif exercise['exercise_type'] == 21:
+            title_number = int(exercise['exercise_info']['title'][1])
+            for variant in exercise['exercise_info']['variants']:
+                if int(variant[1]) == title_number:
+                    exercise['answer'] = variant[1]
+                    return
+        elif exercise['exercise_type'] == 23:
+            equation_parts = [exercise['exercise_info']['title_parts'][0],
+                              exercise['exercise_info']['title_parts'][1].split('=')[0]]
+            equation_result = exercise['exercise_info']['title_parts'][1].split('=')[1]
+            exercise['answer'] = calc_operators(equation_parts, equation_result)
+        elif exercise['exercise_type'] == 24:
+            title_equation_result = eval_with_replace(exercise['exercise_info']['title'])
+            for variant in exercise['exercise_info']['variants']:
+                if eval_with_replace(variant) == title_equation_result:
+                    exercise['answer'] = variant
+                    return
+        elif exercise['exercise_type'] == 25:
+            for variant in exercise['exercise_info']['variants']:
+                if variant[0] == exercise['exercise_info']['subtitle'][0]:
+                    exercise['answer'] = variant[0]
+                    return
+        elif exercise['exercise_type'] == 26:
+            exercise['answer'] = str(eval_with_replace(exercise['exercise_info']['title'].split('=')[0]))
 
 
 CORS(app)
 
 
 def run():
-    app.run()
+    app.run(host="0.0.0.0")
 
 
 for exercise in exercises_flatten:
