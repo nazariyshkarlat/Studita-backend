@@ -59,7 +59,7 @@ with open('dict/offline_exercises_dict', 'r', encoding='utf-8') as f:
 unLoggedLevels = copy.deepcopy(levels)
 unLoggedLevels = unLoggedLevels[:2]
 unLoggedLevels[1]["children"].insert(0, {"type": "subscribe",
-                                         "title": "Войдите, чтобы разблокировать ещё 120 заданий",
+                                         "title": "Войдите, чтобы разблокировать ещё 500+ новых упражнений",
                                          "button": ["Войти"]})
 exercises_flatten = []
 for idx, chapter_part in enumerate(exercises):
@@ -1370,7 +1370,7 @@ def calc_operators(components, result):
     for operator in operators:
         if eval_with_replace(components[0] + operator + components[1]) == int(result):
             return operator
-        
+
 
 def eval_with_replace(equation, round_to_int=True):
     return int(eval(replace_operators(equation))) if round_to_int else eval(replace_operators(equation))
@@ -1585,7 +1585,7 @@ def compute_exercise_answer(exercise):
         elif exercise['exercise_type'] == 25:
             for variant in exercise['exercise_info']['variants']:
                 if variant[0] == exercise['exercise_info']['subtitle'][0]:
-                    exercise['answer'] = variant[0]
+                    exercise['answer'] = variant[1]
                     return
         elif exercise['exercise_type'] == 26:
             exercise['answer'] = str(eval_with_replace(exercise['exercise_info']['title'].split('=')[0]))
@@ -1595,7 +1595,7 @@ CORS(app)
 
 
 def run():
-    app.run(host="0.0.0.0")
+    app.run(host="0.0.0.0", port=34867)
 
 
 for exercise in exercises_flatten:
