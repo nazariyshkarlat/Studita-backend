@@ -31,26 +31,7 @@
    {
       "level_number":2,
       "children":[
-         {
-            "type":"chapter",
-            "chapter_number":3,
-            "title":"Основы алгебры",
-            "subtitle":"Изучение переменных и их значение. Продолжение темы арифметики.",
-            "chapter_parts_count":0
-         },
-         {
-            "type":"chapter",
-            "chapter_number":4,
-            "title":"Основы геометрии",
-            "subtitle":"Изучение прямых, отрезков, лучей, ломанных и прямоугольников.",
-            "chapter_parts_count":0
-         }
-      ]
-   },
-   {
-      "level_number":3,
-      "children":[
-         {
+      {
             "type":"subscribe",
             "title":"500+ новых упражнений будут добавлены очень скоро",
             "button":[
@@ -60,9 +41,9 @@
          },
          {
             "type":"chapter",
-            "chapter_number":5,
-            "title":"Алгебра",
-            "subtitle":"Будет заполнено",
+            "chapter_number":3,
+            "title":"Основы алгебры",
+            "subtitle":"Изучение переменных и их значение. Продолжение темы арифметики.",
             "chapter_parts_count":0
          }
       ]

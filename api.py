@@ -57,10 +57,9 @@ with open('dict/offline_exercises_dict', 'r', encoding='utf-8') as f:
     offline_exercises_diff = j.loads(offline_exercises_diff)
 
 unLoggedLevels = copy.deepcopy(levels)
-unLoggedLevels = unLoggedLevels[:2]
-unLoggedLevels[1]["children"].insert(0, {"type": "subscribe",
+unLoggedLevels[1]["children"][0] = {"type": "subscribe",
                                          "title": "Войдите, чтобы разблокировать ещё 500+ новых упражнений",
-                                         "button": ["Войти"]})
+                                         "button": ["Войти"]}
 exercises_flatten = []
 for idx, chapter_part in enumerate(exercises):
     for idx1, exercise in enumerate(chapter_part['exercises']):
@@ -301,7 +300,7 @@ def get_exercise(number):
                                                                               'description_content':
                                                                                   variant}})
             elif current_exercise['exercise_type'] == 25:
-                if current_exercise['exercise_info']['subtitle'][0] == answer['answer']:
+                if current_exercise['answer'] == answer['answer']:
                     return json_200({'result': True})
                 else:
                     for variant in current_exercise['exercise_info']['variants']:
@@ -445,7 +444,7 @@ def edit_profile():
                             except:
                                 {}
                         request.files['avatar'].save(full_filename)
-                        user_data.avatar_link = "http://37.53.93.223:5037/static/avatars/{0}".format(file_name)
+                        user_data.avatar_link = "http://37.53.93.223:34867/static/avatars/{0}".format(file_name)
                     else:
                         user_data.avatar_link = json['user_data'].get('avatar_link', None)
                     user_data.user_name = user_name
@@ -1152,6 +1151,34 @@ def check_correct_token():
         return Response(status=400)
 
 
+@app.route('/send_exercise_report', methods=['POST'])
+def save_exercise_report():
+    print(request.headers)
+    print(request.data)
+    try:
+        json = request.get_json()
+
+        if json.get('auth_data'):
+            user_id = json['auth_data']['user_id']
+            token = json['auth_data']['user_token']
+        if json.get('auth_data') is None or check_token(user_id, token):
+            data_user_id = json["report_data"].get('user_id')
+            exercise_number = json["report_data"]['exercise_number']
+            bug_types = json["report_data"]['bugs']
+
+            for bug_type in bug_types:
+                db.session.add(ExerciseReport(user_id=data_user_id, bug_type=bug_type, exercise_number=exercise_number))
+
+            db.session.commit()
+
+            return Response(status=200)
+        else:
+            return Response(status=404)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
 @app.route('/has_friends', methods=['GET'])
 def has_friends():
     print(request.headers)
@@ -1582,11 +1609,6 @@ def compute_exercise_answer(exercise):
                 if eval_with_replace(variant) == title_equation_result:
                     exercise['answer'] = variant
                     return
-        elif exercise['exercise_type'] == 25:
-            for variant in exercise['exercise_info']['variants']:
-                if variant[0] == exercise['exercise_info']['subtitle'][0]:
-                    exercise['answer'] = variant[1]
-                    return
         elif exercise['exercise_type'] == 26:
             exercise['answer'] = str(eval_with_replace(exercise['exercise_info']['title'].split('=')[0]))
 
@@ -1595,7 +1617,7 @@ CORS(app)
 
 
 def run():
-    app.run(host="0.0.0.0", port=34867)
+    app.run(host="0.0.0.0")
 
 
 for exercise in exercises_flatten:

@@ -104,6 +104,20 @@ class FirebaseToken(db.Model):
     device_id = db.Column(db.String(200), nullable=False)
 
 
+class ExerciseReport(db.Model):
+    EXERCISE_MISTAKE = 1
+    CANT_UNDERSTAND = 2
+    ANSWER_IS_CORRECT = 3
+    ANSWER_IS_INCORRECT = 4
+
+    __tablename__ = 'exercises_reports'
+
+    record_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=True)
+    exercise_number = db.Column(db.Integer, nullable=False)
+    bug_type = db.Column(db.Integer, nullable=False)
+
+
 def as_dict(model):
     return {c.name: getattr(model, c.name) for c in model.__table__.columns}
 
