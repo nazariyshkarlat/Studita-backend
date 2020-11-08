@@ -90,7 +90,7 @@
    {
       "type":"exercise",
       "exercise_type":8,
-      "exercise_number":172,
+      "exercise_number":173,
       "exercise_info":{
          "title":"198+ ... =1198",
          "subtitle":"Укажите пропущенное число",
@@ -103,7 +103,7 @@
    {
       "type":"exercise",
       "exercise_type":6,
-      "exercise_number":180,
+      "exercise_number":181,
       "exercise_info":{
          "title":"91+100=?",
          "subtitle":"Какова сумма сложения 91+100?",
@@ -117,7 +117,7 @@
    {
       "type":"exercise",
       "exercise_type":10,
-      "exercise_number":209,
+      "exercise_number":210,
       "exercise_info":{
          "title_parts":[
             "9+",
@@ -130,7 +130,7 @@
    {
       "type":"exercise",
       "exercise_type":8,
-      "exercise_number":213,
+      "exercise_number":214,
       "exercise_info":{
          "title":"8+ ... =88",
          "subtitle":"Укажите пропущенное число",
@@ -143,7 +143,7 @@
    {
       "type":"exercise",
       "exercise_type":10,
-      "exercise_number":219,
+      "exercise_number":220,
       "exercise_info":{
          "title_parts":[
             "90+",
@@ -156,7 +156,7 @@
    {
       "type":"exercise",
       "exercise_type":10,
-      "exercise_number":228,
+      "exercise_number":229,
       "exercise_info":{
          "title_parts":[
             "3+",

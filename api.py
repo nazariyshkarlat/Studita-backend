@@ -29,7 +29,7 @@ from flask_cors import CORS
 import uuid
 
 utf = 'UTF-8'
-CLIENT_ID = "100888478237-lldqud6eng1l50k3isp1ovkvl18ev34i.apps.googleusercontent.com"
+CLIENT_ID = "205245547424-behqlmr7iv98r04aboe3akaq18o1k8l8.apps.googleusercontent.com"
 
 EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
 
@@ -56,10 +56,7 @@ with open('dict/offline_exercises_dict', 'r', encoding='utf-8') as f:
     offline_exercises_diff = f.read()
     offline_exercises_diff = j.loads(offline_exercises_diff)
 
-unLoggedLevels = copy.deepcopy(levels)
-unLoggedLevels[1]["children"][0] = {"type": "subscribe",
-                                         "title": "Войдите, чтобы разблокировать ещё 500+ новых упражнений",
-                                         "button": ["Войти"]}
+
 exercises_flatten = []
 for idx, chapter_part in enumerate(exercises):
     for idx1, exercise in enumerate(chapter_part['exercises']):
@@ -69,50 +66,41 @@ for idx, chapter_part in enumerate(exercises):
 
 @app.route('/levels', methods=['GET'])
 def get_levels():
-    print(request.headers)
-    print(request.data)
-    return json_200(levels if str2bool(request.args.get('logged_in')) else unLoggedLevels)
+    return json_200(levels)
 
 
 @app.route('/levels/<number>', methods=['GET'])
 def get_level(number):
-    print(request.headers)
-    print(request.data)
     return number_bounds(number, levels)
 
 
 @app.route('/chapters', methods=['GET'])
 def get_chapters():
-    print(request.headers)
-    print(request.data)
     return json_200(chapters)
 
 
 @app.route('/chapters/<number>', methods=['GET'])
 def get_chapter(number):
-    print(request.headers)
-    print(request.data)
     return number_bounds(number, chapters)
 
 
 @app.route('/chapter_parts/<number>', methods=['GET'])
 def get_exercises(number):
-    print(request.headers)
-    print(request.data)
     return number_bounds(number, exercises)
 
 
 @app.route('/offline_exercises', methods=['GET'])
 def get_offline_exercises():
-    print(request.headers)
-    print(request.data)
     return json_200(offline_exercises)
+
+
+@app.route('/offline_data', methods=['GET'])
+def get_offline_data():
+    return json_200(offline_data)
 
 
 @app.route('/exercises/<number>', methods=['GET', 'POST'])
 def get_exercise(number):
-    print(request.headers)
-    print(request.data)
     if request.method == 'GET':
         return number_bounds(number, exercises_flatten)
     elif request.method == 'POST':
@@ -203,7 +191,6 @@ def get_exercise(number):
                                                                        'description_content': str(result)}})
             elif current_exercise['exercise_type'] == 12:
                 parts = current_exercise['exercise_info']['title'].replace('...', 'x').replace(' ', '').split('=')
-                print(parts)
                 result = eval_with_replace(parts[0].replace('x', answer['answer']))
                 if result == int(parts[1]):
                     return json_200({'result': True})
@@ -244,9 +231,10 @@ def get_exercise(number):
                                   current_exercise['exercise_info']['title_parts'][1].split('=')[0]]
                 equation_result = current_exercise['exercise_info']['title_parts'][1].split('=')[1]
                 true_answer = calc_operators(equation_parts, equation_result)
-                return json_200({'result': True} if replace_operators(answer['answer']) == replace_operators(true_answer)
-                                else {'result': False, 'description': {'description_type': 'text',
-                                                                       'description_content': true_answer}})
+                return json_200(
+                    {'result': True} if replace_operators(answer['answer']) == replace_operators(true_answer)
+                    else {'result': False, 'description': {'description_type': 'text',
+                                                           'description_content': true_answer}})
             elif current_exercise['exercise_type'] == 17:
                 equation_result = str(eval_with_replace(current_exercise['exercise_info']['title'][1]))
                 return json_200({'result': True} if answer['answer'] == equation_result
@@ -304,10 +292,10 @@ def get_exercise(number):
                     return json_200({'result': True})
                 else:
                     for variant in current_exercise['exercise_info']['variants']:
-                        if variant[0] == current_exercise['exercise_info']['subtitle'][0]:
+                        if variant == current_exercise['answer']:
                             return json_200({'result': False, 'description': {'description_type': 'text',
                                                                               'description_content':
-                                                                                  variant[1]}})
+                                                                                  variant}})
             elif current_exercise['exercise_type'] == 26:
                 title_result = eval_with_replace(current_exercise['exercise_info']['title'].split('=')[0])
                 return json_200({'result': True} if title_result == int(answer['answer'])
@@ -321,22 +309,16 @@ def get_exercise(number):
 
 @app.route('/interesting/<number>', methods=['GET'])
 def get_interesting(number):
-    print(request.headers)
-    print(request.data)
     return number_bounds(number, interesting_list)
 
 
 @app.route('/interesting', methods=['GET'])
 def get_interesting_list():
-    print(request.headers)
-    print(request.data)
     return json_200(interesting_list)
 
 
 @app.route('/user_data', methods=['GET'])
 def get_user_data():
-    print(request.headers)
-    print(request.data)
     try:
         user_id = request.args.get("user_id")
         today = convert_datetime_str(request.headers['Date']).date()
@@ -355,19 +337,23 @@ def get_user_data():
 
 @app.route('/complete_exercises', methods=['POST'])
 def complete_exercises():
-    print(request.headers)
-    print(request.data)
     try:
+        t.sleep(10)
         json = request.get_json()
         user_id = json['auth_data']['user_id']
         token = json['auth_data']['user_token']
         if check_token(user_id, token):
+
+            completed_datetime = convert_datetime_str(json['completed_exercises_data']['datetime'])
+
+            if db.session.query(UserStatistics).filter_by(user_id=user_id, datetime=completed_datetime).scalar() is not None:
+                return Response(status=200)
+
             user_data = db.session.query(UserData).filter_by(user_id=user_id).one()
             percent = json['completed_exercises_data']['percent']
             chapter_number = json['completed_exercises_data']['chapter_number']
             chapter_part_in_chapter_number = json['completed_exercises_data']['chapter_part_in_chapter_number']
             obtained_time = json['completed_exercises_data']['obtained_time']
-            completed_datetime = convert_datetime_str(json['completed_exercises_data']['datetime'])
             exercises_bonus_correct_count = json['completed_exercises_data']['exercises_bonus_correct_count']
 
             is_training = user_data.completed_parts[chapter_number - 1] >= chapter_part_in_chapter_number
@@ -411,7 +397,7 @@ def complete_exercises():
             db.session.commit()
             return Response(status=200)
         else:
-            return Response(status=404)
+            return Response(status=400)
 
     except Exception as e:
         print(e)
@@ -420,8 +406,6 @@ def complete_exercises():
 
 @app.route('/edit_profile', methods=['POST'])
 def edit_profile():
-    print(request.headers)
-    print(request.data)
     try:
         json = j.loads(request.form.to_dict()['json'])
         user_id = json['auth_data']['user_id']
@@ -430,9 +414,9 @@ def edit_profile():
             user_data = db.session.query(UserData).filter_by(user_id=user_id).one()
             if user_utils.user_name_not_exists(db, json['user_data']['user_name'], user_data.user_name):
                 user_name = json['user_data']['user_name'].strip()
-                name = json['user_data'].get('name', None).strip()
-                print(name)
-                if user_utils.is_valid_edit_profile_data(user_name):
+                name = json['user_data'].get('name', None)
+
+                if user_utils.is_valid_profile_data(user_name, name):
                     if 'avatar' in request.files:
                         file_name = uuid.uuid1().hex
                         file_name = '{0}.jpg'.format(file_name)
@@ -456,7 +440,7 @@ def edit_profile():
             else:
                 return Response(status=409)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -464,8 +448,6 @@ def edit_profile():
 
 @app.route('/is_user_name_available', methods=['GET'])
 def is_user_name_available():
-    print(request.headers)
-    print(request.data)
     try:
         user_name = request.args.get('user_name').strip()
         if user_utils.match_user_name(user_name):
@@ -481,8 +463,6 @@ def is_user_name_available():
 
 @app.route('/user_statistics/<time>', methods=['GET'])
 def get_user_statistics_by_time(time):
-    print(request.headers)
-    print(request.data)
     try:
         user_id = request.args.get("user_id")
         labels = ["obtained_XP", "obtained_time", "obtained_exercises", "obtained_trainings", "obtained_achievements"]
@@ -527,8 +507,6 @@ def get_user_statistics_by_time(time):
 
 @app.route('/user_statistics', methods=['GET'])
 def get_user_statistics():
-    print(request.headers)
-    print(request.data)
     try:
         user_id = request.args.get("user_id")
         times = ["today", "yesterday", "week", "month"]
@@ -570,8 +548,6 @@ def get_user_statistics():
 
 @app.route('/sign_in_with_google', methods=['POST'])
 def sign_in_with_google():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         idToken = json['id_token']
@@ -581,17 +557,21 @@ def sign_in_with_google():
         else:
             user_email = idInfo["email"]
             user = db.session.query(User).filter_by(user_email=user_email, user_type='g').first()
+
             if not user:
-                user_data = create_new_user(user_email, None, json)
+                user_data = create_new_user(user_email, None, json, idInfo["picture"] if not idInfo["picture"].endswith("photo.jpg") else None)
             else:
                 user_data = db.session.query(UserData).filter_by(user_id=user.user_id).one()
 
-            token = create_token(user_data.user_id, json['push_data']['device_id'])
-            create_firebase_token(user_data.user_id, json)
+            if user_data:
+                token = create_token(user_data.user_id, json['push_data']['device_id'])
+                create_firebase_token(user_data.user_id, json)
 
-            db.session.commit()
-            return json_200(
-                {**{'user_id': user_data.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
+                db.session.commit()
+                return json_200(
+                    {**{'user_id': user_data.user_id, 'user_token': token, 'is_after_sign_up': not user}, "user_data": {**as_dict(user_data)}})
+            else:
+                return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -599,19 +579,18 @@ def sign_in_with_google():
 
 @app.route('/sign_up', methods=['POST'])
 def sign_up():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_email = json['user_email']
         user_password = json['user_password']
         if (len(user_password) < 6) or (not EMAIL_REGEX.match(user_email)):
-            raise Exception()
+            return Response(status=400)
         user = db.session.query(User).filter_by(user_email=user_email, user_type='s').first()
         if not user:
-            create_new_user(user_email, user_password, json)
-            db.session.commit()
-            return Response(status=200)
+            if create_new_user(user_email, user_password, json, None):
+                return Response(status=200)
+            else:
+                return Response(status=400)
         else:
             return Response(status=409)
     except Exception as e:
@@ -621,8 +600,6 @@ def sign_up():
 
 @app.route('/log_in', methods=['POST'])
 def log_in():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_email = json['user_email']
@@ -652,8 +629,6 @@ def log_in():
 
 @app.route('/sign_out', methods=['POST'])
 def sign_out():
-    print(request.headers)
-    print(request.data)
     json = request.get_json()
 
     tokens = db.session.query(UserToken) \
@@ -674,13 +649,11 @@ def sign_out():
     if len(firebase_tokens) != 0 and len(tokens) != 0:
         return Response(status=200)
     else:
-        return Response(status=404)
+        return Response(status=400)
 
 
 @app.route('/subscribe_email', methods=['POST'])
 def subscribe_email():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['user_id']
@@ -692,7 +665,7 @@ def subscribe_email():
             db.session.commit()
             return json_200({"user_email": user.user_email})
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -700,8 +673,6 @@ def subscribe_email():
 
 @app.route('/unsubscribe_email', methods=['POST'])
 def unsubscribe_email():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['user_id']
@@ -713,7 +684,7 @@ def unsubscribe_email():
             db.session.commit()
             return json_200({"user_email": user.user_email})
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -721,8 +692,6 @@ def unsubscribe_email():
 
 @app.route('/privacy_settings', methods=['POST'])
 def get_privacy_settings():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['user_id']
@@ -741,10 +710,10 @@ def get_privacy_settings():
 
             return json_200({"duels_invites_from": privacy_settings.duels_invites_from,
                              "show_in_ratings": privacy_settings.show_in_ratings,
-                             "profile_is_visible": privacy_settings.profile_visible,
+                             "profile_is_visible": privacy_settings.profile_is_visible,
                              "duels_exceptions": exceptions_names})
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -752,8 +721,6 @@ def get_privacy_settings():
 
 @app.route('/privacy_duels_exceptions', methods=['POST'])
 def get_privacy_duels_exceptions_list():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['user_id']
@@ -763,30 +730,29 @@ def get_privacy_duels_exceptions_list():
         page_number = int(request.args.get("page_number"))
         if check_token(user_id, token):
 
-            friends = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
+            items = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link,
+                                     PrivacyDuelsException.exception_id) \
                 .group_by(Friendship.user_id, Friendship.friend_id) \
                 .outerjoin(Friendship,
                            db.or_(Friendship.user_id == UserData.user_id, Friendship.friend_id == UserData.user_id)) \
+                .outerjoin(PrivacyDuelsException, PrivacyDuelsException.exception_id == UserData.user_id) \
                 .filter(db.or_(Friendship.user_id == user_id, Friendship.friend_id == user_id)) \
                 .filter(UserData.user_id != user_id) \
-                .order_by(db.asc(UserData.user_name)) \
+                .order_by(PrivacyDuelsException.exception_id == None, UserData.user_name.asc()) \
                 .paginate(page_number, per_page, False).items
 
-            if len(friends) == 0:
+            if len(items) == 0:
                 return json_200([])
 
-            friends = [dict(zip(["user_id", "user_name", "avatar_link"], friend)) for friend in
-                       friends]
+            friends = [dict(zip(["user_id", "user_name", "avatar_link", "is_exception"], friend)) for friend in
+                       items]
 
             for friend in friends:
-                is_exception = db.session.query(PrivacyDuelsException).filter_by(user_id=int(user_id),
-                                                                                 exception_id=friend[
-                                                                                     'user_id']).scalar() is not None if user_id else False
-                friend.update({'is_exception': is_exception})
+                friend.update({'is_exception': friend["is_exception"] is not None})
 
             return json_200(friends)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -794,8 +760,6 @@ def get_privacy_duels_exceptions_list():
 
 @app.route('/notifications', methods=['POST'])
 def get_notifications():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['user_id']
@@ -805,8 +769,9 @@ def get_notifications():
         page_number = int(request.args.get("page_number"))
         if check_token(user_id, token):
 
-            db.session.query(UserData).filter_by(user_id=user_id).update(dict(notifications_are_checked=True))
-            db.session.commit()
+            if page_number == 1:
+                db.session.query(UserData).filter_by(user_id=user_id).update(dict(notifications_are_checked=True))
+                db.session.commit()
 
             notifications = db.session.query(UserData.user_id,
                                              UserData.user_name,
@@ -853,7 +818,7 @@ def get_notifications():
 
             return json_200(notifications_dicts)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -861,8 +826,6 @@ def get_notifications():
 
 @app.route('/edit_duels_exceptions', methods=['POST'])
 def edit_duels_exceptions():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['auth_data']['user_id']
@@ -875,8 +838,7 @@ def edit_duels_exceptions():
                 if exception['delete']:
                     exception = db.session.query(PrivacyDuelsException).filter_by(user_id=user_id,
                                                                                   exception_id=exception[
-                                                                                      'exception_id']).one()
-                    db.session.delete(exception)
+                                                                                      'exception_id']).delete()
                 else:
                     if db.session.query(PrivacyDuelsException).filter_by(user_id=user_id,
                                                                          exception_id=exception[
@@ -897,7 +859,7 @@ def edit_duels_exceptions():
 
             return Response(status=200)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -905,8 +867,6 @@ def edit_duels_exceptions():
 
 @app.route('/edit_privacy_settings', methods=['POST'])
 def edit_privacy_settings():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['auth_data']['user_id']
@@ -919,12 +879,12 @@ def edit_privacy_settings():
             if 'show_in_ratings' in json['privacy_settings']:
                 privacy_settings.show_in_ratings = json['privacy_settings']['show_in_ratings']
             if 'profile_is_visible' in json['privacy_settings']:
-                privacy_settings.profile_visible = json['privacy_settings']['profile_is_visible']
+                privacy_settings.profile_is_visible = json['privacy_settings']['profile_is_visible']
 
             db.session.commit()
             return Response(status=200)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -932,8 +892,6 @@ def edit_privacy_settings():
 
 @app.route('/send_friendship', methods=['POST'])
 def send_friendship():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['auth_data']['user_id']
@@ -944,18 +902,18 @@ def send_friendship():
                     db.or_(db.and_(FriendshipRequest.requesting_id == user_id,
                                    FriendshipRequest.recipient_id == json['friend_id']),
                            db.and_(FriendshipRequest.requesting_id == json['friend_id'],
-                                   FriendshipRequest.recipient_id == user_id))).scalar() is None:
+                                   FriendshipRequest.recipient_id == user_id))).first() is None:
                 friendship_request = FriendshipRequest(requesting_id=user_id, recipient_id=json['friend_id'])
                 notification = Notification(user_id=json['friend_id'], id_user_from=user_id, notification_type='f',
                                             datetime_sent=datetime.utcnow())
 
-                user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).first()
+                user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).one()
                 firebase_tokens = db.session.query(FirebaseToken).filter_by(user_id=json['friend_id']).all()
                 db.session.query(UserData).filter_by(user_id=json['friend_id']).update(
                     dict(notifications_are_checked=False))
 
-                last_friend_notification = db.session.query(Notification).filter_by(user_id=user_id,
-                                                                                    id_user_from=json['friend_id'],
+                last_friend_notification = db.session.query(Notification).filter_by(user_id=json['friend_id'],
+                                                                                    id_user_from=user_id,
                                                                                     notification_type="f").order_by(
                     db.desc(Notification.datetime_sent)).first()
 
@@ -978,14 +936,14 @@ def send_friendship():
                         except Exception as e:
                             db.session.delete(token_data)
 
-                    db.session.add(notification)
+                        db.session.add(notification)
                 db.session.add(friendship_request)
                 db.session.commit()
                 return Response(status=200)
             else:
-                return Response(status=404)
+                return Response(status=400)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -993,8 +951,6 @@ def send_friendship():
 
 @app.route('/accept_friendship', methods=['POST'])
 def accept_friendship():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['auth_data']['user_id']
@@ -1011,13 +967,13 @@ def accept_friendship():
                     db.and_(FriendshipRequest.requesting_id == int(user_id),
                             FriendshipRequest.recipient_id == json['friend_id']),
                     db.and_(FriendshipRequest.requesting_id == json['friend_id'],
-                            FriendshipRequest.recipient_id == int(user_id)))).first()
+                            FriendshipRequest.recipient_id == int(user_id))))
 
-                if friendship_request:
+                if friendship_request.first():
                     notification = Notification(user_id=json['friend_id'], id_user_from=user_id, notification_type='a',
                                                 datetime_sent=datetime.utcnow())
 
-                    user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).first()
+                    user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).one()
                     firebase_tokens = db.session.query(FirebaseToken).filter_by(user_id=json['friend_id']).all()
                     db.session.query(UserData).filter_by(user_id=json['friend_id']).update(
                         dict(notifications_are_checked=False))
@@ -1035,17 +991,17 @@ def accept_friendship():
                         except Exception as e:
                             db.session.delete(token_data)
 
-                    db.session.delete(friendship_request)
+                    friendship_request.delete()
                     db.session.add(friendship)
                     db.session.add(notification)
                     db.session.commit()
                     return Response(status=200)
                 else:
-                    return Response(status=404)
+                    return Response(status=400)
             else:
-                return Response(status=404)
+                return Response(status=400)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1053,8 +1009,6 @@ def accept_friendship():
 
 @app.route('/reject_friendship', methods=['POST'])
 def reject_friendship():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['auth_data']['user_id']
@@ -1064,16 +1018,16 @@ def reject_friendship():
                 db.and_(FriendshipRequest.requesting_id == int(user_id),
                         FriendshipRequest.recipient_id == json['friend_id']),
                 db.and_(FriendshipRequest.requesting_id == json['friend_id'],
-                        FriendshipRequest.recipient_id == int(user_id)))).first()
+                        FriendshipRequest.recipient_id == int(user_id))))
 
-            if friendship_request:
-                db.session.delete(friendship_request)
+            if friendship_request.first():
+                friendship_request.delete()
                 db.session.commit()
                 return Response(status=200)
             else:
-                return Response(status=404)
+                return Response(status=400)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1081,8 +1035,6 @@ def reject_friendship():
 
 @app.route('/remove_friend', methods=['POST'])
 def remove_friend():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['auth_data']['user_id']
@@ -1090,19 +1042,19 @@ def remove_friend():
         if check_token(user_id, token):
             friend = db.session.query(Friendship).filter(
                 db.or_(db.and_(Friendship.user_id == int(user_id), Friendship.friend_id == json['friend_id']),
-                       db.and_(Friendship.user_id == json['friend_id'], Friendship.friend_id == int(user_id)))).first()
+                       db.and_(Friendship.user_id == json['friend_id'], Friendship.friend_id == int(user_id))))
             duels_exception = db.session.query(PrivacyDuelsException).filter_by(user_id=int(user_id),
                                                                                 exception_id=json['friend_id']).first()
-            if friend:
+            if friend.first():
                 if duels_exception:
                     db.session.delete(duels_exception)
-                db.session.delete(friend)
+                friend.delete()
                 db.session.commit()
                 return Response(status=200)
             else:
-                return Response(status=404)
+                return Response(status=400)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1110,8 +1062,6 @@ def remove_friend():
 
 @app.route('/cancel_friendship', methods=['POST'])
 def cancel_friendship():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['auth_data']['user_id']
@@ -1122,16 +1072,16 @@ def cancel_friendship():
                     db.and_(FriendshipRequest.requesting_id == int(user_id),
                             FriendshipRequest.recipient_id == json['friend_id']),
                     db.and_(FriendshipRequest.requesting_id == json['friend_id'],
-                            FriendshipRequest.recipient_id == int(user_id)))).first()
+                            FriendshipRequest.recipient_id == int(user_id))))
 
-            if friendship_request:
-                db.session.delete(friendship_request)
+            if friendship_request.scalar():
+                friendship_request.delete()
                 db.session.commit()
                 return Response(status=200)
             else:
-                return Response(status=404)
+                return Response(status=400)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1139,8 +1089,6 @@ def cancel_friendship():
 
 @app.route('/authentication', methods=['POST'])
 def check_correct_token():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
         user_id = json['user_id']
@@ -1153,27 +1101,54 @@ def check_correct_token():
 
 @app.route('/send_exercise_report', methods=['POST'])
 def save_exercise_report():
-    print(request.headers)
-    print(request.data)
     try:
         json = request.get_json()
 
-        if json.get('auth_data'):
+        is_logged_in = json.get('auth_data') is not None
+
+        if is_logged_in:
             user_id = json['auth_data']['user_id']
             token = json['auth_data']['user_token']
-        if json.get('auth_data') is None or check_token(user_id, token):
-            data_user_id = json["report_data"].get('user_id')
+
+        if not is_logged_in or check_token(user_id, token):
             exercise_number = json["report_data"]['exercise_number']
             bug_types = json["report_data"]['bugs']
 
             for bug_type in bug_types:
-                db.session.add(ExerciseReport(user_id=data_user_id, bug_type=bug_type, exercise_number=exercise_number))
+                db.session.add(ExerciseReport(user_id=None if not is_logged_in else user_id, bug_type=bug_type, exercise_number=exercise_number))
 
             db.session.commit()
 
             return Response(status=200)
         else:
-            return Response(status=404)
+            return Response(status=400)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
+@app.route('/send_interesting_like', methods=['POST'])
+def save_interesting_like():
+    try:
+        json = request.get_json()
+
+        is_logged_in = json.get('auth_data') is not None
+
+        if is_logged_in:
+            user_id = json['auth_data']['user_id']
+            token = json['auth_data']['user_token']
+
+        if not is_logged_in or check_token(user_id, token):
+            interesting_number = json["like_data"]['interesting_number']
+            like_it = json["like_data"]['like_it']
+
+            db.session.add(InterestingLike(user_id=None if not is_logged_in else user_id, interesting_number=interesting_number, like_it=like_it))
+
+            db.session.commit()
+
+            return Response(status=200)
+        else:
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1181,8 +1156,6 @@ def save_exercise_report():
 
 @app.route('/has_friends', methods=['GET'])
 def has_friends():
-    print(request.headers)
-    print(request.data)
     try:
         user_id = int(request.args.get('user_id'))
         friends_count = db.session.query(Friendship).filter(
@@ -1195,8 +1168,6 @@ def has_friends():
 
 @app.route('/get_users', methods=['GET'])
 def get_users():
-    print(request.headers)
-    print(request.data)
     try:
 
         user_id = request.args.get('user_id')
@@ -1262,12 +1233,13 @@ def get_users():
                 .subquery()
 
             users_query = db.session.query(UserData.user_id, UserData.user_name, UserData.avatar_link) \
-                .filter(UserData.user_id.notin_(friends_ids_subquery))
+                .outerjoin(PrivacySettings, UserData.user_id == PrivacySettings.user_id) \
+                .filter(UserData.user_id.notin_(friends_ids_subquery)) \
+                .filter(PrivacySettings.profile_is_visible.is_(True))
 
             if starts_with:
                 user_name = starts_with.replace('@', '')
-                users_query = users_query.filter(
-                    db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
+                users_query = users_query.filter(UserData.user_name.ilike(user_name + '%'))
 
             users = users_query.paginate(page_number, per_page, False).items
 
@@ -1301,6 +1273,7 @@ def get_users():
             user.update(is_my_friend)
 
         response = {'users_count': friends_count, 'users': users}
+        print(users)
         return json_200(response)
     except Exception as e:
         print(e)
@@ -1314,12 +1287,12 @@ def notifications_are_checked():
         user_id = json['user_id']
         token = json['user_token']
         if check_token(user_id, token):
-            db.session.query(UserData).filter_by(user_id=145).update(
+            db.session.query(UserData).filter_by(user_id=user_id).update(
                 dict(notifications_are_checked=True))
             db.session.commit()
             return Response(status=200)
         else:
-            return Response(status=404)
+            return Response(status=400)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1327,8 +1300,6 @@ def notifications_are_checked():
 
 @app.route('/is_my_friend', methods=['GET'])
 def check_is_my_friend():
-    print(request.headers)
-    print(request.data)
     try:
         my_id = int(request.args.get('my_id'))
         user_id = int(request.args.get('user_id'))
@@ -1349,8 +1320,6 @@ def check_is_my_friend():
                 response['friendship_from_me'] = True
             else:
                 response['friendship_to_me'] = True
-
-        print(response)
         return json_200(response)
     except Exception as e:
         print(e)
@@ -1444,39 +1413,80 @@ def replace_operators(equation):
     return equation
 
 
-def create_new_user(user_email, user_password, unregistered_user_data_json):
+def create_new_user(user_email, user_password, unregistered_user_data_json, avatar_url):
     hash_password = encrypt(user_password) if user_password else None
-    new_user = User(user_email=user_email, user_type='s' if hash_password else 'g', datetime_added=datetime.utcnow(),
-                    user_password=hash_password)
-    db.session.add(new_user)
-    db.session.commit()
+    user_name = form_user_name(user_email)
 
-    name = user_email.split('@')[0]
-    if "user_data" in unregistered_user_data_json:
-        user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=name,
-                             current_level=unregistered_user_data_json["user_data"]["current_level"],
-                             current_level_XP=unregistered_user_data_json["user_data"]["current_level_XP"],
-                             streak_days=unregistered_user_data_json["user_data"]["streak_days"],
-                             streak_datetime=convert_datetime_str(
-                                 unregistered_user_data_json["user_data"]["streak_datetime"]),
-                             completed_parts=unregistered_user_data_json["user_data"]["completed_parts"])
+    if user_utils.match_user_name(user_name):
+
+        new_user = User(user_email=user_email, user_type='s' if hash_password else 'g',
+                        datetime_added=datetime.utcnow(),
+                        user_password=hash_password)
+        db.session.add(new_user)
+        db.session.flush()
+
+        if "user_data" in unregistered_user_data_json:
+            user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=user_name,
+                                 current_level=unregistered_user_data_json["user_data"]["current_level"],
+                                 current_level_XP=unregistered_user_data_json["user_data"]["current_level_XP"],
+                                 streak_days=unregistered_user_data_json["user_data"]["streak_days"],
+                                 streak_datetime=convert_datetime_str(
+                                     unregistered_user_data_json["user_data"]["streak_datetime"]),
+                                 completed_parts=unregistered_user_data_json["user_data"]["completed_parts"],
+                                 avatar_link=avatar_url)
+        else:
+            user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=user_name, avatar_link=avatar_url)
+        db.session.add(user_data)
+
+        if "user_statistics" in unregistered_user_data_json:
+            for stat in unregistered_user_data_json['user_statistics']:
+                stat.update({'user_id': new_user.user_id})
+                user_stat = UserStatistics(**stat)
+                user_stat.datetime = convert_datetime_str(user_stat.datetime)
+                db.session.add(user_stat)
+
+        privacy_settings = PrivacySettings(user_id=new_user.user_id)
+        db.session.add(privacy_settings)
+        db.session.commit()
+
+        # thread = threading.Thread(target=send_mail.send_mail, args=(user_email,))
+        # thread.start()
+        return user_data
     else:
-        user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=name)
-    db.session.add(user_data)
+        return None
 
-    if "user_statistics" in unregistered_user_data_json:
-        for stat in unregistered_user_data_json['user_statistics']:
-            stat.update({'user_id': new_user.user_id})
-            user_stat = UserStatistics(**stat)
-            user_stat.datetime = convert_datetime_str(user_stat.datetime)
-            db.session.add(user_stat)
 
-    privacy_settings = PrivacySettings(user_id=new_user.user_id)
-    db.session.add(privacy_settings)
+def form_user_name(email):
+    user_name = email.split('@')[0]
 
-    thread = threading.Thread(target=send_mail.send_mail, args=(user_email,))
-    thread.start()
-    return user_data
+    if len(user_name) > user_utils.MAX_USER_NAME_LENGTH:
+        user_name = user_name[:user_utils.MAX_USER_NAME_LENGTH]
+
+    user_name_is_smaller = len(user_name) < user_utils.MIN_USER_NAME_LENGTH
+    user_name_missing_chars_count = max(user_utils.MIN_USER_NAME_LENGTH - len(user_name), 0)
+
+    if user_name_is_smaller:
+        user_name = user_name + ("0" * user_name_missing_chars_count)
+
+    i = 1
+    while db.session.query(UserData).filter_by(user_name=user_name).scalar() is not None:
+
+        user_name = (user_name[:len(user_name) - user_name_missing_chars_count] if user_name_is_smaller else user_name[:len(user_name)-(len(str(i-1)) if i-1 > 0 else 0)]) + str(
+            i)
+
+        user_name_is_smaller = len(user_name) < user_utils.MIN_USER_NAME_LENGTH
+
+        if user_name_is_smaller:
+            user_name = user_name[:len(user_name) - len(str(i))] + (
+                    "0" * max(user_utils.MIN_USER_NAME_LENGTH - len(user_name), 0)) + str(i)
+
+        if len(user_name) > user_utils.MAX_USER_NAME_LENGTH:
+            len_diff = len(user_name)-user_utils.MAX_USER_NAME_LENGTH
+            user_name = user_name[:len(user_name)-(len(str(i))+len_diff)] + str(i)
+
+        i = i + 1
+
+    return user_name
 
 
 def create_firebase_token(user_id, json):
@@ -1612,13 +1622,7 @@ def compute_exercise_answer(exercise):
         elif exercise['exercise_type'] == 26:
             exercise['answer'] = str(eval_with_replace(exercise['exercise_info']['title'].split('=')[0]))
 
-
 CORS(app)
-
-
-def run():
-    app.run(host="0.0.0.0")
-
 
 for exercise in exercises_flatten:
     if exercise.get('is_bonus'):
@@ -1626,4 +1630,4 @@ for exercise in exercises_flatten:
 
 offline_exercises = get_offline_exercises_list(exercises, offline_exercises_diff)
 
-run()
+offline_data = {"offline_exercises": offline_exercises, "chapters": chapters, "levels": levels, "interesting": interesting_list}

@@ -57,7 +57,7 @@ class PrivacySettings(db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     duels_invites_from = db.Column(db.String(1), nullable=False, default='f')
     show_in_ratings = db.Column(db.Boolean, nullable=False, default=True)
-    profile_visible = db.Column(db.Boolean, nullable=False, default=True)
+    profile_is_visible = db.Column(db.Boolean, nullable=False, default=True)
 
 
 class PrivacyDuelsException(db.Model):
@@ -116,6 +116,16 @@ class ExerciseReport(db.Model):
     user_id = db.Column(db.Integer, nullable=True)
     exercise_number = db.Column(db.Integer, nullable=False)
     bug_type = db.Column(db.Integer, nullable=False)
+
+
+class InterestingLike(db.Model):
+
+    __tablename__ = 'interesting_likes'
+
+    record_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=True)
+    interesting_number = db.Column(db.Integer, nullable=False)
+    like_it = db.Column(db.Boolean, nullable=False)
 
 
 def as_dict(model):
