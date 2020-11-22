@@ -29,7 +29,7 @@ from flask_cors import CORS
 import uuid
 
 utf = 'UTF-8'
-CLIENT_ID = "205245547424-behqlmr7iv98r04aboe3akaq18o1k8l8.apps.googleusercontent.com"
+CLIENT_ID = "568009941526-4te9dh9l7vnfo22bmi9hfdk9q5ae3eqp.apps.googleusercontent.com"
 
 EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
 
@@ -338,7 +338,6 @@ def get_user_data():
 @app.route('/complete_exercises', methods=['POST'])
 def complete_exercises():
     try:
-        t.sleep(10)
         json = request.get_json()
         user_id = json['auth_data']['user_id']
         token = json['auth_data']['user_token']
@@ -364,6 +363,26 @@ def complete_exercises():
             new_levels_count = level_utils.get_new_levels_count(user_data, obtained_XP)
             new_level_XP = level_utils.get_new_level_XP(user_data, obtained_XP)
 
+            user_stat = UserStatistics(user_id=user_id)
+
+            user_stat.datetime = completed_datetime
+
+            if is_training:
+                user_stat.obtained_trainings = 1
+            else:
+                user_stat.obtained_exercises = 1
+
+            user_stat.obtained_XP = obtained_XP
+            user_stat.obtained_time = obtained_time
+
+            db.session.add(user_stat)
+
+            try:
+                db.session.commit()
+            except Exception as e:
+                print(e)
+                return Response(status=200)
+
             if not is_training:
                 new_completed_parts = user_data.completed_parts.copy()
                 if new_completed_parts[chapter_number - 1] + 1 == chapter_part_in_chapter_number:
@@ -379,20 +398,6 @@ def complete_exercises():
                 else:
                     user_data.streak_days = UserData.streak_days + 1
                 user_data.streak_datetime = completed_datetime
-
-            user_stat = UserStatistics(user_id=user_id)
-
-            user_stat.datetime = completed_datetime
-
-            if is_training:
-                user_stat.obtained_trainings = 1
-            else:
-                user_stat.obtained_exercises = 1
-
-            user_stat.obtained_XP = obtained_XP
-            user_stat.obtained_time = obtained_time
-
-            db.session.add(user_stat)
 
             db.session.commit()
             return Response(status=200)
@@ -414,7 +419,13 @@ def edit_profile():
             user_data = db.session.query(UserData).filter_by(user_id=user_id).one()
             if user_utils.user_name_not_exists(db, json['user_data']['user_name'], user_data.user_name):
                 user_name = json['user_data']['user_name'].strip()
+
                 name = json['user_data'].get('name', None)
+
+                if name:
+                    name = name.strip()
+                    if len(name) == 0:
+                        name = None
 
                 if user_utils.is_valid_profile_data(user_name, name):
                     if 'avatar' in request.files:
@@ -1093,6 +1104,9 @@ def check_correct_token():
         json = request.get_json()
         user_id = json['user_id']
         token = json['user_token']
+        print(user_id)
+        print(token)
+        print("token is correct " + str(check_token(user_id, token) is not None).lower())
         return Response(str(check_token(user_id, token) is not None).lower(), status=200)
     except Exception as e:
         print(e)
@@ -1503,6 +1517,11 @@ def create_firebase_token(user_id, json):
 
 def create_token(user_id, device_id):
     token = generate_token()
+
+    old_tokens = db.session.query(UserToken).filter_by(user_id=user_id, device_id=device_id)
+
+    old_tokens.delete()
+
     new_token = UserToken(user_id=user_id, user_token=token, device_id=device_id)
 
     db.session.add(new_token)
@@ -1621,6 +1640,7 @@ def compute_exercise_answer(exercise):
                     return
         elif exercise['exercise_type'] == 26:
             exercise['answer'] = str(eval_with_replace(exercise['exercise_info']['title'].split('=')[0]))
+
 
 CORS(app)
 
