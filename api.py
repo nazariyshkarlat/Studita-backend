@@ -1253,7 +1253,7 @@ def get_users():
 
             if starts_with:
                 user_name = starts_with.replace('@', '')
-                users_query = users_query.filter(UserData.user_name.ilike(user_name + '%'))
+                users_query = users_query.filter(db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
 
             users = users_query.paginate(page_number, per_page, False).items
 
