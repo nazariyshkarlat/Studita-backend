@@ -1,7 +1,5 @@
 from database.models import UserData
 import re
-import time
-from collections import Counter
 
 MIN_USER_NAME_LENGTH = 3
 MAX_USER_NAME_LENGTH = 25

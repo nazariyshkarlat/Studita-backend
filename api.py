@@ -12,11 +12,13 @@ import time as t
 from itertools import chain
 import string
 import operator
+from googleapiclient.discovery import build
 import random
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from google.oauth2 import id_token
 from google.auth.transport import requests
+import requests as r
 from flask_config import app
 import copy
 from user import level_utils
@@ -27,9 +29,13 @@ from sympy import Symbol
 import json as j
 from flask_cors import CORS
 import uuid
+import os.path
+
+SCOPES = ['https://www.googleapis.com/auth/userinfo.profile']
 
 utf = 'UTF-8'
 CLIENT_ID = "568009941526-4te9dh9l7vnfo22bmi9hfdk9q5ae3eqp.apps.googleusercontent.com"
+API_KEY = 'AIzaSyA1PtDc0aFfmlJ3iRZVQhj9270Tfb0PVrQ'
 
 EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
 
@@ -570,7 +576,10 @@ def sign_in_with_google():
             user = db.session.query(User).filter_by(user_email=user_email, user_type='g').first()
 
             if not user:
-                user_data = create_new_user(user_email, None, json, idInfo["picture"] if not idInfo["picture"].endswith("photo.jpg") else None)
+                profile_json = r.get('https://people.googleapis.com/v1/people/' + idInfo[
+                    'sub'] + '?key=' + API_KEY + '&personFields=photos').json()
+                is_default_photo = any([photo.get('default') for photo in profile_json['photos']])
+                user_data = create_new_user(user_email, None, json, None if is_default_photo else idInfo["picture"])
             else:
                 user_data = db.session.query(UserData).filter_by(user_id=user.user_id).one()
 
@@ -1104,9 +1113,6 @@ def check_correct_token():
         json = request.get_json()
         user_id = json['user_id']
         token = json['user_token']
-        print(user_id)
-        print(token)
-        print("token is correct " + str(check_token(user_id, token) is not None).lower())
         return Response(str(check_token(user_id, token) is not None).lower(), status=200)
     except Exception as e:
         print(e)
@@ -1287,7 +1293,6 @@ def get_users():
             user.update(is_my_friend)
 
         response = {'users_count': friends_count, 'users': users}
-        print(users)
         return json_200(response)
     except Exception as e:
         print(e)
