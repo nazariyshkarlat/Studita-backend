@@ -990,6 +990,7 @@ def accept_friendship():
                             FriendshipRequest.recipient_id == int(user_id))))
 
                 if friendship_request.first():
+                    request_notification = db.session.query(Notification).filter_by(user_id=user_id, id_user_from=json['friend_id'], notification_type='f')
                     notification = Notification(user_id=json['friend_id'], id_user_from=user_id, notification_type='a',
                                                 datetime_sent=datetime.utcnow())
 
@@ -1011,6 +1012,7 @@ def accept_friendship():
                         except Exception as e:
                             db.session.delete(token_data)
 
+                    request_notification.delete()
                     friendship_request.delete()
                     db.session.add(friendship)
                     db.session.add(notification)
@@ -1039,9 +1041,28 @@ def reject_friendship():
                         FriendshipRequest.recipient_id == json['friend_id']),
                 db.and_(FriendshipRequest.requesting_id == json['friend_id'],
                         FriendshipRequest.recipient_id == int(user_id))))
-
+            request_notification = db.session.query(Notification).filter_by(user_id=user_id,
+                                                                           id_user_from=json['friend_id'],
+                                                                           notification_type='f')
             if friendship_request.first():
+
+                user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).one()
+                firebase_tokens = db.session.query(FirebaseToken).filter_by(user_id=json['friend_id']).all()
+
+                for token_data in firebase_tokens:
+                    content = {'type': 'r', 'user_name': user_data.user_name, 'user_id': str(user_id)}
+
+                    if user_data.avatar_link:
+                        content.update({'avatar_link': user_data.avatar_link})
+                    try:
+                        message = messaging.Message(data=content,
+                                                    token=token_data.token)
+                        messaging.send(message)
+                    except Exception as e:
+                        db.session.delete(token_data)
+
                 friendship_request.delete()
+                request_notification.delete()
                 db.session.commit()
                 return Response(status=200)
             else:
@@ -1068,6 +1089,22 @@ def remove_friend():
             if friend.first():
                 if duels_exception:
                     db.session.delete(duels_exception)
+
+                user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).one()
+                firebase_tokens = db.session.query(FirebaseToken).filter_by(user_id=json['friend_id']).all()
+
+                for token_data in firebase_tokens:
+                    content = {'type': 'r', 'user_name': user_data.user_name, 'user_id': str(user_id)}
+
+                    if user_data.avatar_link:
+                        content.update({'avatar_link': user_data.avatar_link})
+                    try:
+                        message = messaging.Message(data=content,
+                                                    token=token_data.token)
+                        messaging.send(message)
+                    except Exception as e:
+                        db.session.delete(token_data)
+
                 friend.delete()
                 db.session.commit()
                 return Response(status=200)
@@ -1093,8 +1130,29 @@ def cancel_friendship():
                             FriendshipRequest.recipient_id == json['friend_id']),
                     db.and_(FriendshipRequest.requesting_id == json['friend_id'],
                             FriendshipRequest.recipient_id == int(user_id))))
+            request_notification = db.session.query(Notification).filter_by(user_id=json['friend_id'],
+                                                                           id_user_from=user_id,
+                                                                           notification_type='f')
+            if friendship_request.first():
 
-            if friendship_request.scalar():
+                user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).one()
+                firebase_tokens = db.session.query(FirebaseToken).filter_by(user_id=json['friend_id']).all()
+                db.session.query(UserData).filter_by(user_id=json['friend_id']).update(
+                    dict(notifications_are_checked=True))
+
+                for token_data in firebase_tokens:
+                    content = {'type': 'c', 'user_name': user_data.user_name, 'user_id': str(user_id)}
+
+                    if user_data.avatar_link:
+                        content.update({'avatar_link': user_data.avatar_link})
+                    try:
+                        message = messaging.Message(data=content,
+                                                    token=token_data.token)
+                        messaging.send(message)
+                    except Exception as e:
+                        db.session.delete(token_data)
+
+                request_notification.delete()
                 friendship_request.delete()
                 db.session.commit()
                 return Response(status=200)
