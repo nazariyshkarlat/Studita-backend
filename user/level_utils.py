@@ -1,5 +1,4 @@
 from sqlalchemy import func
-from datetime import datetime, timedelta
 from database.models import UserStatistics
 
 SEQUENCE_TO_BONUS = 5
@@ -66,7 +65,7 @@ def get_today_completed_exercises_count(today, user_data, db):
     today_completed = len(db.session.query(UserStatistics)
                           .filter_by(user_id=user_data.user_id)
                           .filter(today_filter)
-                          .filter(UserStatistics.obtained_exercises > 0).all())
+                          .filter(UserStatistics.completed_exercises > 0).all())
     return today_completed
 
 
@@ -83,7 +82,6 @@ def get_new_level_XP(user_data, obtained_XP):
         max_level_XP = get_level_XP(user_data.current_level + new_levels)
 
     return new_XP
-
 
 def get_new_levels_bonus(user_data, obtained_XP):
     return get_new_levels_count(user_data, obtained_XP) * NEXT_LEVEL_BONUS

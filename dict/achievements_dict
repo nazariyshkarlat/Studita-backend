@@ -1,0 +1,162 @@
+[
+   {
+      "type":1,
+      "title":"Усердный",
+      "exercise":[
+         "Удерживайте дэй-стрик 1 день подряд",
+         "Удерживайте дэй-стрик 7 дней подряд",
+         "Удерживайте дэй-стрик 30 дней подряд",
+         "Удерживайте дэй-стрик 356 дней подряд",
+         "Вы удерживали дэй-стрик 356 дней подряд и находитесь на максимальном уровне"
+      ],
+      "reward":[
+         "После выполнения вы получите 500 XP и бронзовую медаль",
+         "После выполнения вы получите 1000 XP и серебряную медаль",
+         "После выполнения вы получите 2000 XP и золотую медаль",
+         "После выполнения вы получите 5000 XP и алмазную медаль"
+      ],
+      "max_level":4,
+      "max_progress":[
+         1,
+         7,
+         30,
+         365
+      ],
+      "progress_type":"Дней подряд",
+      "improvable":true,
+      "icon_url":[
+         "http://37.53.93.223:34867/static/achievements/streak_bronze.svg",
+         "http://37.53.93.223:34867/static/achievements/streak_silver.svg",
+         "http://37.53.93.223:34867/static/achievements/streak_gold.svg",
+         "http://37.53.93.223:34867/static/achievements/streak_diamond.svg"
+      ]
+   },
+   {
+      "type":2,
+      "title":"Ученик",
+      "exercise":[
+         "Пройдите 5 заданий",
+         "Пройдите 50 заданий",
+         "Пройдите 100 заданий",
+         "Пройдите 500 заданий",
+         "Вы прошли 500 заданий и находитесь на максимальном уровне"
+      ],
+      "reward":[
+         "После выполнения вы получите 500 XP и бронзовую медаль",
+         "После выполнения вы получите 1000 XP и серебряную медаль",
+         "После выполнения вы получите 2000 XP и золотую медаль",
+         "После выполнения вы получите 5000 XP и алмазную медаль"
+      ],
+      "max_level":4,
+      "max_progress":[
+         5,
+         50,
+         100,
+         500
+      ],
+      "progress_type":"Заданий пройдено",
+      "improvable":true,
+      "icon_url":[
+         "http://37.53.93.223:34867/static/achievements/exercises_bronze.svg",
+         "http://37.53.93.223:34867/static/achievements/exercises_silver.svg",
+         "http://37.53.93.223:34867/static/achievements/exercises_gold.svg",
+         "http://37.53.93.223:34867/static/achievements/exercises_diamond.svg"
+      ]
+   },
+   {
+      "type":3,
+      "title":"Практикующий",
+      "exercise":[
+         "Пройдите 5 тренировок",
+         "Пройдите 50 тренировок",
+         "Пройдите 100 тренировок",
+         "Пройдите 500 тренировок",
+         "Вы прошли 500 тренировок и находитесь на максимальном уровне"
+      ],
+      "reward":[
+         "После выполнения вы получите 500 XP и бронзовую медаль",
+         "После выполнения вы получите 1000 XP и серебряную медаль",
+         "После выполнения вы получите 2000 XP и золотую медаль",
+         "После выполнения вы получите 5000 XP и алмазную медаль"
+      ],
+      "max_level":4,
+      "max_progress":[
+         5,
+         50,
+         100,
+         500
+      ],
+      "progress_type":"Тренировок пройдено",
+      "improvable":true,
+      "icon_url":[
+         "http://37.53.93.223:34867/static/achievements/trainings_bronze.svg",
+         "http://37.53.93.223:34867/static/achievements/trainings_silver.svg",
+         "http://37.53.93.223:34867/static/achievements/trainings_gold.svg",
+         "http://37.53.93.223:34867/static/achievements/trainings_diamond.svg"
+      ]
+   },
+   {
+      "type":4,
+      "title":"Эрудит",
+      "exercise":[
+         "Пройдите 1 главу",
+         "Пройдите 3 главы",
+         "Пройдите 5 глав",
+         "Пройдите 15 глав",
+         "Вы прошли 15 глав и находитесь на максимальном уровне"
+      ],
+      "reward":[
+         "После выполнения вы получите 500 XP и бронзовую медаль",
+         "После выполнения вы получите 1000 XP и серебряную медаль",
+         "После выполнения вы получите 2000 XP и золотую медаль",
+         "После выполнения вы получите 5000 XP и алмазную медаль"
+      ],
+      "max_level":4,
+      "max_progress":[
+         1,
+         3,
+         5,
+         15
+      ],
+      "progress_type":"Тем пройдено",
+      "improvable":true,
+      "icon_url":[
+         "http://37.53.93.223:34867/static/achievements/chapters_bronze.svg",
+         "http://37.53.93.223:34867/static/achievements/chapters_silver.svg",
+         "http://37.53.93.223:34867/static/achievements/chapters_gold.svg",
+         "http://37.53.93.223:34867/static/achievements/chapters_diamond.svg"
+      ]
+   },
+   {
+      "type":5,
+      "title":"Социальный",
+      "exercise":"Добавьте 1 человека к себе в список друзей",
+      "reward":"После выполнения вы получите 300 XP и медаль \"Социальный\"",
+      "improvable":false,
+      "icon_url":"http://37.53.93.223:34867/static/achievements/social.svg"
+   },
+   {
+      "type":6,
+      "title":"Фотогеничный",
+      "exercise":"Добавьте свою фотографию в профиле",
+      "reward":"После выполнения вы получите 300 XP и медаль \"Фотогеничный\"",
+      "improvable":false,
+      "icon_url":"http://37.53.93.223:34867/static/achievements/photogenic.svg"
+   },
+   {
+      "type":7,
+      "title":"Биография",
+      "exercise":"Напишите что-нибудь о себе в своём профиле",
+      "reward":"После выполнения вы получите 300 XP и медаль \"Биография\"",
+      "improvable":false,
+      "icon_url":"http://37.53.93.223:34867/static/achievements/bio.svg"
+   },
+   {
+      "type":8,
+      "title":"Имя",
+      "exercise":"Добавьте своё имя в настройках профиля",
+      "reward":"После выполнения вы получите 300 XP и медаль \"Имя\"",
+      "improvable":false,
+      "icon_url":"http://37.53.93.223:34867/static/achievements/name.svg"
+   }
+]

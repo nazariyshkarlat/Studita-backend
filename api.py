@@ -7,6 +7,9 @@ from firebase_admin import credentials
 from smtp import send_mail
 import threading
 import re
+from user.achievements import achievements_utils
+from user import statistics_utils
+from user.achievements.achievements_info import achievements
 import os
 import time as t
 from itertools import chain
@@ -61,7 +64,6 @@ with open('dict/exercises_dict', 'r', encoding='utf-8') as f:
 with open('dict/offline_exercises_dict', 'r', encoding='utf-8') as f:
     offline_exercises_diff = f.read()
     offline_exercises_diff = j.loads(offline_exercises_diff)
-
 
 exercises_flatten = []
 for idx, chapter_part in enumerate(exercises):
@@ -351,7 +353,8 @@ def complete_exercises():
 
             completed_datetime = convert_datetime_str(json['completed_exercises_data']['datetime'])
 
-            if db.session.query(UserStatistics).filter_by(user_id=user_id, datetime=completed_datetime).scalar() is not None:
+            if db.session.query(UserStatistics).filter_by(user_id=user_id,
+                                                          datetime=completed_datetime).scalar() is not None:
                 return Response(status=200)
 
             user_data = db.session.query(UserData).filter_by(user_id=user_id).one()
@@ -374,26 +377,24 @@ def complete_exercises():
             user_stat.datetime = completed_datetime
 
             if is_training:
-                user_stat.obtained_trainings = 1
+                user_stat.completed_trainings = 1
             else:
-                user_stat.obtained_exercises = 1
+                user_stat.completed_trainings = 1
 
             user_stat.obtained_XP = obtained_XP
             user_stat.obtained_time = obtained_time
 
             db.session.add(user_stat)
 
-            try:
-                db.session.commit()
-            except Exception as e:
-                print(e)
-                return Response(status=200)
-
             if not is_training:
                 new_completed_parts = user_data.completed_parts.copy()
                 if new_completed_parts[chapter_number - 1] + 1 == chapter_part_in_chapter_number:
                     new_completed_parts[chapter_number - 1] += 1
                     user_data.completed_parts = new_completed_parts
+
+                    for chapter in chapters:
+                        if chapter["chapter_number"] == chapter_number and len(chapter["parts"]) == new_completed_parts[chapter_number - 1]:
+                            user_stat.completed_chapters = 1
 
             user_data.current_level = UserData.current_level + new_levels_count
             user_data.current_level_XP = new_level_XP
@@ -403,9 +404,17 @@ def complete_exercises():
                     user_data.streak_days = 1
                 else:
                     user_data.streak_days = UserData.streak_days + 1
+
                 user_data.streak_datetime = completed_datetime
 
-            db.session.commit()
+            user_stat.days_streak = user_data.streak_days
+
+            achievements_utils.giveNewImprovableAchievements(user_id, db)
+
+            try:
+                db.session.commit()
+            except Exception as e:
+                print(e)
             return Response(status=200)
         else:
             return Response(status=400)
@@ -428,12 +437,19 @@ def edit_profile():
 
                 name = json['user_data'].get('name', None)
 
+                bio = json['user_data'].get('bio', None)
+
                 if name:
                     name = name.strip()
                     if len(name) == 0:
                         name = None
 
-                if user_utils.is_valid_profile_data(user_name, name):
+                if bio:
+                    bio = bio.strip()
+                    if len(bio) == 0:
+                        bio = None
+
+                if user_utils.is_valid_profile_data(user_name, name, bio):
                     if 'avatar' in request.files:
                         file_name = uuid.uuid1().hex
                         file_name = '{0}.jpg'.format(file_name)
@@ -442,14 +458,24 @@ def edit_profile():
                             try:
                                 os.remove("{0}/{1}".format(app.config['UPLOAD_FOLDER'],
                                                            user_data.avatar_link.split("avatars/")[1]))
-                            except:
-                                {}
+                            except Exception as e:
+                                print(e)
                         request.files['avatar'].save(full_filename)
+                        if user_data.avatar_link is None:
+                            achievements_utils.giveNonImprovableAchievementByType(achievements_utils.TYPE_SET_AVATAR, user_id, db)
+
                         user_data.avatar_link = "http://37.53.93.223:34867/static/avatars/{0}".format(file_name)
                     else:
                         user_data.avatar_link = json['user_data'].get('avatar_link', None)
                     user_data.user_name = user_name
+
+                    if user_data.name is None and name is not None:
+                        achievements_utils.giveNonImprovableAchievementByType(achievements_utils.TYPE_SET_NAME, user_id, db)
+                    if user_data.bio is None and bio is not None:
+                        achievements_utils.giveNonImprovableAchievementByType(achievements_utils.TYPE_SET_BIO, user_id, db)
+
                     user_data.name = name
+                    user_data.bio = bio
                     db.session.commit()
                     return json_200({"avatar_link": user_data.avatar_link})
                 else:
@@ -482,7 +508,6 @@ def is_user_name_available():
 def get_user_statistics_by_time(time):
     try:
         user_id = request.args.get("user_id")
-        labels = ["obtained_XP", "obtained_time", "obtained_exercises", "obtained_trainings", "obtained_achievements"]
 
         today = convert_datetime_str(request.headers['Date']).date()
         yesterday = today - timedelta(days=1)
@@ -495,11 +520,13 @@ def get_user_statistics_by_time(time):
         month_filter = func.DATE(UserStatistics.datetime) >= month
 
         query = db.session.query(db.func.coalesce(db.func.sum(UserStatistics.obtained_XP), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_time), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_exercises), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_trainings), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_achievements), 0)) \
-            .filter_by(user_id=user_id)
+                                 db.func.coalesce(db.func.sum(UserStatistics.time_spent), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.completed_exercises), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.completed_trainings), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_achievements), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.completed_chapters), 0),
+                                 db.func.coalesce(db.func.max(UserStatistics.days_streak), 0)) \
+                .filter_by(user_id=user_id)
 
         if time == "month":
             results = query.filter(month_filter)[0]
@@ -514,7 +541,7 @@ def get_user_statistics_by_time(time):
 
         if results:
             int_results = (int(result) for result in results)
-            results_dict = dict(zip(labels, int_results))
+            results_dict = dict(zip(statistics_utils.labels, int_results))
             results_dict.update({"time_type": time})
             return json_200(results_dict)
     except Exception as e:
@@ -527,8 +554,6 @@ def get_user_statistics():
     try:
         user_id = request.args.get("user_id")
         times = ["today", "yesterday", "week", "month"]
-        labels = ["obtained_XP", "obtained_time", "obtained_exercises", "obtained_trainings",
-                  "obtained_achievements"]
 
         today = convert_datetime_str(request.headers['Date']).date()
         yesterday = today - timedelta(days=1)
@@ -541,10 +566,12 @@ def get_user_statistics():
         month_filter = func.DATE(UserStatistics.datetime) >= month
 
         query = db.session.query(db.func.coalesce(db.func.sum(UserStatistics.obtained_XP), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_time), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_exercises), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_trainings), 0),
-                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_achievements), 0)) \
+                                 db.func.coalesce(db.func.sum(UserStatistics.time_spent), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.completed_exercises), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.completed_trainings), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.obtained_achievements), 0),
+                                 db.func.coalesce(db.func.sum(UserStatistics.completed_chapters), 0),
+                                 db.func.coalesce(db.func.max(UserStatistics.days_streak), 0)) \
             .filter_by(user_id=user_id)
 
         results_array = [query.filter(today_filter)[0], query.filter(yesterday_filter)[0], query.filter(week_filter)[0],
@@ -554,7 +581,7 @@ def get_user_statistics():
         if results_array:
             for idx, results in enumerate(results_array):
                 int_results = (int(result) for result in results)
-                results_dict = dict(zip(labels, int_results))
+                results_dict = dict(zip(statistics_utils.labels, int_results))
                 results_dict.update({'time_type': times[idx]})
                 results_dict_array.append(results_dict)
             return json_200(results_dict_array)
@@ -589,7 +616,8 @@ def sign_in_with_google():
 
                 db.session.commit()
                 return json_200(
-                    {**{'user_id': user_data.user_id, 'user_token': token, 'is_after_sign_up': not user}, "user_data": {**as_dict(user_data)}})
+                    {**{'user_id': user_data.user_id, 'user_token': token, 'is_after_sign_up': not user},
+                     "user_data": {**as_dict(user_data)}})
             else:
                 return Response(status=400)
     except Exception as e:
@@ -796,46 +824,59 @@ def get_notifications():
             notifications = db.session.query(UserData.user_id,
                                              UserData.user_name,
                                              UserData.avatar_link,
+                                             Notification.id_user_from,
                                              Notification.notification_type,
                                              Notification.datetime_sent) \
-                .filter(UserData.user_id == Notification.id_user_from) \
+                .join(UserData, Notification.id_user_from == UserData.user_id, isouter=True) \
+                .filter(db.or_(UserData.user_id == Notification.id_user_from, Notification.id_user_from == None)) \
                 .filter(Notification.user_id == user_id).order_by(db.desc(Notification.datetime_sent)).paginate(
                 page_number, per_page, False).items
 
-            notifications_dicts = [dict(zip(["user_id", "user_name", "avatar_link", "notification_type"], notification))
-                                   for
-                                   notification in
-                                   notifications]
+            notifications_dicts = []
+            for notification in notifications:
+                notification = dict(zip(["user_id", "user_name", "avatar_link", "id_user_from", "notification_type", "datetime_sent"], notification))
+                time_diff = datetime.utcnow() - notification["datetime_sent"]
+                del notification["datetime_sent"]
+                if notification["id_user_from"] is not None:
+                    is_my_friend = db.session.query(Friendship).filter(
+                        db.or_(db.and_(Friendship.user_id == int(user_id),
+                                       Friendship.friend_id == notification['user_id']),
+                               db.and_(Friendship.user_id == notification['user_id'],
+                                       Friendship.friend_id == int(
+                                           user_id)))).scalar() is not None if user_id is not None else False
 
-            for idx, notification in enumerate(notifications):
-                time_diff = datetime.utcnow() - notification.datetime_sent
-                is_my_friend = db.session.query(Friendship).filter(
-                    db.or_(db.and_(Friendship.user_id == int(user_id),
-                                   Friendship.friend_id == notifications_dicts[idx]['user_id']),
-                           db.and_(Friendship.user_id == notifications_dicts[idx]['user_id'],
-                                   Friendship.friend_id == int(
-                                       user_id)))).scalar() is not None if user_id is not None else False
+                    friendship_request = db.session.query(FriendshipRequest).filter(
+                        db.or_(db.and_(FriendshipRequest.requesting_id == int(user_id),
+                                       FriendshipRequest.recipient_id == notification['user_id']),
+                               db.and_(FriendshipRequest.requesting_id == notification['user_id'],
+                                       FriendshipRequest.recipient_id == int(
+                                           user_id)))).first() if user_id is not None else None
 
-                friendship_request = db.session.query(FriendshipRequest).filter(
-                    db.or_(db.and_(FriendshipRequest.requesting_id == int(user_id),
-                                   FriendshipRequest.recipient_id == notifications_dicts[idx]['user_id']),
-                           db.and_(FriendshipRequest.requesting_id == notifications_dicts[idx]['user_id'],
-                                   FriendshipRequest.recipient_id == int(
-                                       user_id)))).first() if user_id is not None else None
+                    is_my_friend = {
+                        'friendship': {'is_my_friend': is_my_friend, 'friendship_from_me': False,
+                                       'friendship_to_me': False}}
 
-                is_my_friend = {
-                    'friendship': {'is_my_friend': is_my_friend, 'friendship_from_me': False,
-                                   'friendship_to_me': False}}
+                    if friendship_request:
+                        if friendship_request.requesting_id == int(user_id):
+                            is_my_friend['friendship']['friendship_from_me'] = True
+                        else:
+                            is_my_friend['friendship']['friendship_to_me'] = True
 
-                if friendship_request:
-                    if friendship_request.requesting_id == int(user_id):
-                        is_my_friend['friendship']['friendship_from_me'] = True
-                    else:
-                        is_my_friend['friendship']['friendship_to_me'] = True
+                    notification.update(is_my_friend)
+                    notifications_dicts.append(notification)
 
-                notifications_dicts[idx].update(is_my_friend)
-                notifications_dicts[idx].update({"seconds_ago": int(time_diff.total_seconds())})
+                else:
+                    notification = achievements_utils.formNotificationDict(user_id,
+                                                                           int(notification["notification_type"].split('_')[1].replace('t', '')),
+                                                                           int(notification["notification_type"].split(
+                                                                               '_')[2].replace('l', '')),
+                                                                           )
+                    notification["notification_type"] = notification.pop("type")
 
+                notification.update({"seconds_ago": int(time_diff.total_seconds())})
+                notifications_dicts.append(notification)
+
+            print(notifications_dicts)
             return json_200(notifications_dicts)
         else:
             return Response(status=400)
@@ -947,7 +988,7 @@ def send_friendship():
                         content = {'type': 'f', 'user_name': user_data.user_name, 'user_id': str(user_id)}
 
                         if user_data.avatar_link:
-                            content.update({'avatar_link': user_data.avatar_link})
+                            content.update({'image_url': user_data.avatar_link})
 
                         try:
                             message = messaging.Message(data=content,
@@ -990,7 +1031,9 @@ def accept_friendship():
                             FriendshipRequest.recipient_id == int(user_id))))
 
                 if friendship_request.first():
-                    request_notification = db.session.query(Notification).filter_by(user_id=user_id, id_user_from=json['friend_id'], notification_type='f')
+                    request_notification = db.session.query(Notification).filter_by(user_id=user_id,
+                                                                                    id_user_from=json['friend_id'],
+                                                                                    notification_type='f')
                     notification = Notification(user_id=json['friend_id'], id_user_from=user_id, notification_type='a',
                                                 datetime_sent=datetime.utcnow())
 
@@ -1003,7 +1046,7 @@ def accept_friendship():
                         content = {'type': 'a', 'user_name': user_data.user_name, 'user_id': str(user_id)}
 
                         if user_data.avatar_link:
-                            content.update({'avatar_link': user_data.avatar_link})
+                            content.update({'image_url': user_data.avatar_link})
 
                         try:
                             message = messaging.Message(data=content,
@@ -1011,6 +1054,12 @@ def accept_friendship():
                             messaging.send(message)
                         except Exception as e:
                             db.session.delete(token_data)
+
+                    if db.session.query(Friendship).filter(db.or_(Friendship.user_id == user_id, Friendship.friend_id == user_id)).first() is None:
+                        achievements_utils.giveNonImprovableAchievementByType(achievements_utils.TYPE_FRIEND_ADD, user_id, db)
+
+                    if db.session.query(Friendship).filter(db.or_(Friendship.user_id == json['friend_id'], Friendship.friend_id == json['friend_id'])).first() is None:
+                        achievements_utils.giveNonImprovableAchievementByType(achievements_utils.TYPE_FRIEND_ADD, json['friend_id'], db)
 
                     request_notification.delete()
                     friendship_request.delete()
@@ -1042,8 +1091,8 @@ def reject_friendship():
                 db.and_(FriendshipRequest.requesting_id == json['friend_id'],
                         FriendshipRequest.recipient_id == int(user_id))))
             request_notification = db.session.query(Notification).filter_by(user_id=user_id,
-                                                                           id_user_from=json['friend_id'],
-                                                                           notification_type='f')
+                                                                            id_user_from=json['friend_id'],
+                                                                            notification_type='f')
             if friendship_request.first():
 
                 user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).one()
@@ -1053,7 +1102,7 @@ def reject_friendship():
                     content = {'type': 'r', 'user_name': user_data.user_name, 'user_id': str(user_id)}
 
                     if user_data.avatar_link:
-                        content.update({'avatar_link': user_data.avatar_link})
+                        content.update({'image_url': user_data.avatar_link})
                     try:
                         message = messaging.Message(data=content,
                                                     token=token_data.token)
@@ -1097,7 +1146,7 @@ def remove_friend():
                     content = {'type': 'r', 'user_name': user_data.user_name, 'user_id': str(user_id)}
 
                     if user_data.avatar_link:
-                        content.update({'avatar_link': user_data.avatar_link})
+                        content.update({'image_url': user_data.avatar_link})
                     try:
                         message = messaging.Message(data=content,
                                                     token=token_data.token)
@@ -1131,8 +1180,8 @@ def cancel_friendship():
                     db.and_(FriendshipRequest.requesting_id == json['friend_id'],
                             FriendshipRequest.recipient_id == int(user_id))))
             request_notification = db.session.query(Notification).filter_by(user_id=json['friend_id'],
-                                                                           id_user_from=user_id,
-                                                                           notification_type='f')
+                                                                            id_user_from=user_id,
+                                                                            notification_type='f')
             if friendship_request.first():
 
                 user_data = db.session.query(UserData).filter_by(user_id=int(user_id)).one()
@@ -1144,7 +1193,7 @@ def cancel_friendship():
                     content = {'type': 'c', 'user_name': user_data.user_name, 'user_id': str(user_id)}
 
                     if user_data.avatar_link:
-                        content.update({'avatar_link': user_data.avatar_link})
+                        content.update({'image_url': user_data.avatar_link})
                     try:
                         message = messaging.Message(data=content,
                                                     token=token_data.token)
@@ -1193,7 +1242,8 @@ def save_exercise_report():
             bug_types = json["report_data"]['bugs']
 
             for bug_type in bug_types:
-                db.session.add(ExerciseReport(user_id=None if not is_logged_in else user_id, bug_type=bug_type, exercise_number=exercise_number))
+                db.session.add(ExerciseReport(user_id=None if not is_logged_in else user_id, bug_type=bug_type,
+                                              exercise_number=exercise_number))
 
             db.session.commit()
 
@@ -1220,7 +1270,9 @@ def save_interesting_like():
             interesting_number = json["like_data"]['interesting_number']
             like_it = json["like_data"]['like_it']
 
-            db.session.add(InterestingLike(user_id=None if not is_logged_in else user_id, interesting_number=interesting_number, like_it=like_it))
+            db.session.add(
+                InterestingLike(user_id=None if not is_logged_in else user_id, interesting_number=interesting_number,
+                                like_it=like_it))
 
             db.session.commit()
 
@@ -1317,7 +1369,8 @@ def get_users():
 
             if starts_with:
                 user_name = starts_with.replace('@', '')
-                users_query = users_query.filter(db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
+                users_query = users_query.filter(
+                    db.or_(UserData.user_name.ilike(user_name + '%'), UserData.name.ilike(user_name + '%')))
 
             users = users_query.paginate(page_number, per_page, False).items
 
@@ -1370,6 +1423,66 @@ def notifications_are_checked():
             return Response(status=200)
         else:
             return Response(status=400)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
+@app.route('/achievements_data', methods=['GET'])
+def get_achievements_data():
+    try:
+        user_id = int(request.args.get('user_id')) if request.args.get('user_id') else None
+        only_completed = str2bool(request.args.get('completed')) if request.args.get('completed') else False
+        db_achievements = as_dict_array(db.session.query(Achievement).filter_by(user_id=user_id).all()) if user_id else []
+        response_achievements = copy.deepcopy(achievements)
+        completed_achievements = []
+        for achievement in response_achievements:
+            if not achievement["improvable"]:
+                achievement.update(dict(completed=any((user_achievement["type"] == achievement["type"] and user_achievement.get("level") == 1) for user_achievement  in db_achievements)))
+            else:
+
+                database_achievement = list(filter(lambda user_achievement: user_achievement["type"] == achievement["type"], db_achievements))
+                database_achievement = database_achievement[0] if len(database_achievement) > 0 else None
+
+                current_level = 0 if not database_achievement else database_achievement["level"]
+
+                array_item_index = current_level-1 if(current_level == achievement["max_level"]) else current_level
+
+                achievement.update(dict(current_level=0 if not database_achievement else database_achievement["level"],
+                                        exercise=achievement["exercise"][current_level],
+                                        current_progress=achievements_utils.getAchievementProgressByType(achievement["type"], user_id, db),
+                                        max_progress=achievement["max_progress"][array_item_index],
+                                        reward=achievement["reward"][array_item_index],
+                                        current_level_icon=achievement["icon_url"][array_item_index-1 if current_level != achievement["max_level"] else array_item_index] if array_item_index > 0 else None,
+                                        next_level_icon=achievement["icon_url"][array_item_index] if current_level != achievement["max_level"] else None,
+                                        ))
+                del achievement["icon_url"]
+
+        if only_completed:
+            for response_achievement in response_achievements:
+                if (response_achievement.get("current_level")  and response_achievement.get("current_level") != 0) or response_achievement.get("completed"):
+                    completed_achievements.append(response_achievement)
+        return json_200(completed_achievements if only_completed else response_achievements)
+    except Exception as e:
+        print(e)
+        return Response(status=400)
+
+
+@app.route('/achievements', methods=['GET'])
+def get_achievements():
+    try:
+        user_id = int(request.args.get('user_id'))
+        db_achievements = as_dict_array(db.session.query(Achievement).filter_by(user_id=user_id).all())
+        response_list = []
+        for db_achievement in db_achievements:
+            if db_achievement["level"] != 0:
+                achievement_data = list(filter(lambda achievement: achievement["type"] == db_achievement["type"], achievements))[0]
+                if not achievement_data["improvable"]:
+                    db_achievement.update(dict(icon_url=achievement_data["icon_url"], improvable=False))
+                else:
+                    db_achievement.update(dict(icon_url=achievement_data["icon_url"][db_achievement["level"]-1], improvable=True))
+                response_list.append(db_achievement)
+        return json_200(response_list)
     except Exception as e:
         print(e)
         return Response(status=400)
@@ -1512,7 +1625,8 @@ def create_new_user(user_email, user_password, unregistered_user_data_json, avat
                                  completed_parts=unregistered_user_data_json["user_data"]["completed_parts"],
                                  avatar_link=avatar_url)
         else:
-            user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=user_name, avatar_link=avatar_url)
+            user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=user_name,
+                                 avatar_link=avatar_url)
         db.session.add(user_data)
 
         if "user_statistics" in unregistered_user_data_json:
@@ -1525,6 +1639,8 @@ def create_new_user(user_email, user_password, unregistered_user_data_json, avat
         privacy_settings = PrivacySettings(user_id=new_user.user_id)
         db.session.add(privacy_settings)
         db.session.commit()
+
+        achievements_utils.giveNewImprovableAchievements(user_data.user_id, db)
 
         # thread = threading.Thread(target=send_mail.send_mail, args=(user_email,))
         # thread.start()
@@ -1548,7 +1664,12 @@ def form_user_name(email):
     i = 1
     while db.session.query(UserData).filter_by(user_name=user_name).scalar() is not None:
 
-        user_name = (user_name[:len(user_name) - user_name_missing_chars_count] if user_name_is_smaller else user_name[:len(user_name)-(len(str(i-1)) if i-1 > 0 else 0)]) + str(
+        user_name = (user_name[:len(user_name) - user_name_missing_chars_count] if user_name_is_smaller else user_name[
+                                                                                                             :len(
+                                                                                                                 user_name) - (
+                                                                                                                  len(
+                                                                                                                      str(
+                                                                                                                          i - 1)) if i - 1 > 0 else 0)]) + str(
             i)
 
         user_name_is_smaller = len(user_name) < user_utils.MIN_USER_NAME_LENGTH
@@ -1558,8 +1679,8 @@ def form_user_name(email):
                     "0" * max(user_utils.MIN_USER_NAME_LENGTH - len(user_name), 0)) + str(i)
 
         if len(user_name) > user_utils.MAX_USER_NAME_LENGTH:
-            len_diff = len(user_name)-user_utils.MAX_USER_NAME_LENGTH
-            user_name = user_name[:len(user_name)-(len(str(i))+len_diff)] + str(i)
+            len_diff = len(user_name) - user_utils.MAX_USER_NAME_LENGTH
+            user_name = user_name[:len(user_name) - (len(str(i)) + len_diff)] + str(i)
 
         i = i + 1
 
@@ -1713,4 +1834,5 @@ for exercise in exercises_flatten:
 
 offline_exercises = get_offline_exercises_list(exercises, offline_exercises_diff)
 
-offline_data = {"offline_exercises": offline_exercises, "chapters": chapters, "levels": levels, "interesting": interesting_list}
+offline_data = {"offline_exercises": offline_exercises, "chapters": chapters, "levels": levels,
+                "interesting": interesting_list}

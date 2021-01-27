@@ -27,6 +27,7 @@ class UserData(db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     user_public_id = db.Column(db.String(36), nullable=False)
     user_name = db.Column(db.String(25), nullable=False)
+    bio = db.Column(db.String(150), default=None)
     name = db.Column(db.String(30), nullable=False)
     avatar_link = db.Column(db.String(100))
     current_level = db.Column(db.Integer, default=1)
@@ -44,11 +45,13 @@ class UserStatistics(db.Model):
     record_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
     datetime = db.Column(db.DateTime, nullable=False)
-    obtained_XP = db.Column(db.Integer)
-    obtained_time = db.Column(db.Integer)
-    obtained_exercises = db.Column(db.Integer)
-    obtained_trainings = db.Column(db.Integer)
-    obtained_achievements = db.Column(db.Integer)
+    obtained_XP = db.Column(db.Integer, nullable=False, default=0)
+    time_spent = db.Column(db.Integer, nullable=False, default=0)
+    completed_exercises = db.Column(db.Integer, nullable=False, default=0)
+    completed_trainings = db.Column(db.Integer, nullable=False, default=0)
+    obtained_achievements = db.Column(db.Integer, nullable=False, default=0)
+    completed_chapters = db.Column(db.Integer, nullable=False, default=0)
+    days_streak = db.Column(db.Integer, nullable=False, default=0)
 
 
 class PrivacySettings(db.Model):
@@ -90,8 +93,8 @@ class Notification(db.Model):
 
     record_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, nullable=False)
-    id_user_from = db.Column(db.Integer, nullable=False)
-    notification_type = db.Column(db.String(1), nullable=False)
+    id_user_from = db.Column(db.Integer, nullable=True)
+    notification_type = db.Column(db.String(10), nullable=False)
     datetime_sent = db.Column(db.DateTime, nullable=False)
 
 
@@ -126,6 +129,32 @@ class InterestingLike(db.Model):
     user_id = db.Column(db.Integer, nullable=True)
     interesting_number = db.Column(db.Integer, nullable=False)
     like_it = db.Column(db.Boolean, nullable=False)
+
+
+class Achievement(db.Model):
+    NO_LEVEL = 0
+    LEVEL_DONE = 1
+
+    LEVEL_BRONZE = 1
+    LEVEL_SILVER = 2
+    LEVEL_GOLD = 3
+    LEVEL_DIAMOND = 4
+
+    TYPE_STREAK = 1
+    TYPE_EXERCISES = 2
+    TYPE_TRAININGS = 3
+    TYPE_CHAPTERS = 4
+    TYPE_FRIEND_ADD = 5
+    TYPE_SET_AVATAR = 6
+    TYPE_SET_BIO = 7
+    TYPE_SET_NAME = 8
+
+    __tablename__ = 'achievements'
+
+    record_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    type = db.Column(db.Integer, nullable=False)
+    level = db.Column(db.Integer, nullable=True)
 
 
 def as_dict(model):
