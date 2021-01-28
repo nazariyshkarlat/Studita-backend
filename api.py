@@ -615,6 +615,8 @@ def sign_in_with_google():
                 create_firebase_token(user_data.user_id, json)
 
                 db.session.commit()
+
+                achievements_utils.giveNewImprovableAchievements(user_data.user_id, db)
                 return json_200(
                     {**{'user_id': user_data.user_id, 'user_token': token, 'is_after_sign_up': not user},
                      "user_data": {**as_dict(user_data)}})
@@ -664,6 +666,8 @@ def log_in():
                 create_firebase_token(user.user_id, json)
 
                 db.session.commit()
+
+                achievements_utils.giveNewImprovableAchievements(user_data.user_id, db)
                 return json_200(
                     {**{'user_id': user.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
             else:
@@ -1639,8 +1643,6 @@ def create_new_user(user_email, user_password, unregistered_user_data_json, avat
         privacy_settings = PrivacySettings(user_id=new_user.user_id)
         db.session.add(privacy_settings)
         db.session.commit()
-
-        achievements_utils.giveNewImprovableAchievements(user_data.user_id, db)
 
         # thread = threading.Thread(target=send_mail.send_mail, args=(user_email,))
         # thread.start()
