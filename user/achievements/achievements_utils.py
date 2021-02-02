@@ -6,19 +6,19 @@ from database.models import UserStatistics, Achievement, UserData, Notification,
 import firebase_admin.messaging as messaging
 
 
-def giveNewImprovableAchievements(user_id, db):
+def giveNewImprovableAchievements(user_id, db, only_send_notifications=False, without_send_notifications=False):
     db_achievements = as_dict_array(db.session.query(Achievement).filter_by(user_id=user_id).all())
     stat = statistics_utils.get_all_time_user_statistics(user_id, db)
     user_data = db.session.query(UserData).filter_by(user_id=user_id).one()
-    giveImprovableAchievementByType(user_data, TYPE_STREAK, user_id, stat["max_streak_days"], db_achievements, db)
-    giveImprovableAchievementByType(user_data, TYPE_EXERCISES, user_id, stat["completed_exercises"], db_achievements, db)
-    giveImprovableAchievementByType(user_data, TYPE_TRAININGS, user_id, stat["completed_trainings"], db_achievements, db)
-    giveImprovableAchievementByType(user_data, TYPE_CHAPTERS, user_id, stat["completed_chapters"], db_achievements, db)
+    giveImprovableAchievementByType(user_data, TYPE_STREAK, user_id, stat["max_streak_days"], db_achievements, db, only_send_notifications, without_send_notifications)
+    giveImprovableAchievementByType(user_data, TYPE_EXERCISES, user_id, stat["completed_exercises"], db_achievements, db, only_send_notifications, without_send_notifications)
+    giveImprovableAchievementByType(user_data, TYPE_TRAININGS, user_id, stat["completed_trainings"], db_achievements, db, only_send_notifications, without_send_notifications)
+    giveImprovableAchievementByType(user_data, TYPE_CHAPTERS, user_id, stat["completed_chapters"], db_achievements, db, only_send_notifications, without_send_notifications)
 
     db.session.commit()
 
 
-def giveImprovableAchievementByType(user_data, achievement_type, user_id, statistics_value, db_achievements, db):
+def giveImprovableAchievementByType(user_data, achievement_type, user_id, statistics_value, db_achievements, db, only_send_notifications, without_send_notifications):
     current_achievement_level = NO_LEVEL if not any(achievement["type"] == achievement_type for achievement in db_achievements) \
         else next(achievement  for achievement in db_achievements if(achievement["type"] == achievement_type))["level"]
 
@@ -26,18 +26,30 @@ def giveImprovableAchievementByType(user_data, achievement_type, user_id, statis
     obtained_XP = 0
     achievement_info = next(achievement_info for achievement_info in achievements_info if achievement_info["type"] == achievement_type)
     for idx, progress in enumerate(achievement_info["progress"]):
-        if statistics_value >= progress and idx+1 > current_achievement_level:
+        if statistics_value >= progress and ((idx+1 > current_achievement_level) or only_send_notifications):
             given_level = idx+1
             obtained_XP = obtained_XP + achievement_info["XP_rewards"][idx]
-            sendAchievementNotification(user_id, db, achievement_type, given_level)
 
-    if given_level > 0:
-        db.session.add(Achievement(user_id = user_id, type = achievement_type, level = given_level))
-    if obtained_XP > 0:
-        new_levels_count = level_utils.get_new_levels_count(user_data, obtained_XP)
-        new_level_XP = level_utils.get_new_level_XP(user_data, obtained_XP)
-        user_data.current_level = user_data.current_level + new_levels_count
-        user_data.current_level_XP = new_level_XP
+            if without_send_notifications:
+                saveAchievementNotification(user_id, db, achievement_type, given_level)
+            elif only_send_notifications:
+                sendAchievementNotification(user_id, db, achievement_type, given_level)
+            else:
+                saveAchievementNotification(user_id, db, achievement_type, given_level)
+                sendAchievementNotification(user_id, db, achievement_type, given_level)
+
+    if not only_send_notifications:
+        if given_level > 0:
+            if given_level == 1:
+                db.session.add(Achievement(user_id = user_id, type = achievement_type, level = given_level))
+            else:
+                achievement = db.session.query(Achievement).filter_by(user_id = user_id, type = achievement_type).one()
+                achievement.level = given_level
+        if obtained_XP > 0:
+            new_levels_count = level_utils.get_new_levels_count(user_data, obtained_XP)
+            new_level_XP = level_utils.get_new_level_XP(user_data, obtained_XP)
+            user_data.current_level = user_data.current_level + new_levels_count
+            user_data.current_level_XP = new_level_XP
 
 
 def giveNonImprovableAchievementByType(achievement_type, user_id, db):
@@ -50,16 +62,12 @@ def giveNonImprovableAchievementByType(achievement_type, user_id, db):
     user_data.current_level_XP = new_level_XP
 
     sendAchievementNotification(user_id, db, achievement_type, 1)
+    saveAchievementNotification(user_id, db, achievement_type, 1)
     db.session.commit()
 
 
 def sendAchievementNotification(user_id, db, achievement_type, achievement_level):
-    type_text = 'ach_t{0}_l{1}'.format(achievement_type, achievement_level)
-
     content = formNotificationDict(user_id, achievement_type, achievement_level)
-    notification = Notification(user_id=user_id, notification_type=type_text,
-                                datetime_sent=datetime.utcnow())
-    db.session.add(notification)
 
     firebase_tokens = db.session.query(FirebaseToken).filter_by(user_id=user_id).all()
     db.session.query(UserData).filter_by(user_id=user_id).update(
@@ -72,6 +80,13 @@ def sendAchievementNotification(user_id, db, achievement_type, achievement_level
             messaging.send(message)
         except Exception as e:
             db.session.delete(token_data)
+
+
+def saveAchievementNotification(user_id, db, achievement_type, achievement_level):
+    type_text = 'ach_t{0}_l{1}'.format(achievement_type, achievement_level)
+    notification = Notification(user_id=user_id, notification_type=type_text,
+                                datetime_sent=datetime.utcnow())
+    db.session.add(notification)
 
 
 def formNotificationDict(user_id, achievement_type, achievement_level):
@@ -89,12 +104,12 @@ def formNotificationDict(user_id, achievement_type, achievement_level):
     else:
         title = notifications_text_russian[1].format(achievement_data['title'])
 
-    print(achievement_type)
-    print(isImprovable)
     if not isImprovable:
-        subtitle = notifications_text_russian[2].format(achievement_info['XP_reward'])
+        reward = achievement_info['XP_reward']
+        subtitle = notifications_text_russian[2].format(reward)
     else:
-        subtitle = notifications_text_russian[3][achievement_level - 1].format(achievement_info['XP_rewards'][achievement_level-1])
+        reward = achievement_info['XP_rewards'][achievement_level-1]
+        subtitle = notifications_text_russian[3][achievement_level - 1].format(reward)
 
     if not isImprovable:
         icon_url = achievement_data['icon_url']
@@ -105,7 +120,8 @@ def formNotificationDict(user_id, achievement_type, achievement_level):
                    'title': title,
                    'subtitle': subtitle,
                    'user_id': str(user_id),
-                   'image_url': icon_url
+                   'image_url': icon_url,
+            'xp_reward': str(reward)
             }
 
 

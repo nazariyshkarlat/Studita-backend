@@ -379,7 +379,7 @@ def complete_exercises():
             if is_training:
                 user_stat.completed_trainings = 1
             else:
-                user_stat.completed_trainings = 1
+                user_stat.completed_exercises = 1
 
             user_stat.obtained_XP = obtained_XP
             user_stat.obtained_time = obtained_time
@@ -616,7 +616,9 @@ def sign_in_with_google():
 
                 db.session.commit()
 
-                achievements_utils.giveNewImprovableAchievements(user_data.user_id, db)
+                if not user:
+                    achievements_utils.giveNewImprovableAchievements(user_data.user_id, db)
+
                 return json_200(
                     {**{'user_id': user_data.user_id, 'user_token': token, 'is_after_sign_up': not user},
                      "user_data": {**as_dict(user_data)}})
@@ -637,7 +639,8 @@ def sign_up():
             return Response(status=400)
         user = db.session.query(User).filter_by(user_email=user_email, user_type='s').first()
         if not user:
-            if create_new_user(user_email, user_password, json, None):
+            if new_user := create_new_user(user_email, user_password, json, None):
+                achievements_utils.giveNewImprovableAchievements(new_user.user_id, db, False, True)
                 return Response(status=200)
             else:
                 return Response(status=400)
@@ -667,7 +670,8 @@ def log_in():
 
                 db.session.commit()
 
-                achievements_utils.giveNewImprovableAchievements(user_data.user_id, db)
+                if json['is_first_log_in'] is True:
+                    achievements_utils.giveNewImprovableAchievements(user_data.user_id, db, True, False)
                 return json_200(
                     {**{'user_id': user.user_id, 'user_token': token}, "user_data": {**as_dict(user_data)}})
             else:
@@ -880,7 +884,6 @@ def get_notifications():
                 notification.update({"seconds_ago": int(time_diff.total_seconds())})
                 notifications_dicts.append(notification)
 
-            print(notifications_dicts)
             return json_200(notifications_dicts)
         else:
             return Response(status=400)
@@ -939,11 +942,12 @@ def edit_privacy_settings():
         if check_token(user_id, token):
             privacy_settings = db.session.query(PrivacySettings).filter_by(user_id=user_id).one()
 
-            if 'duels_invites_from' in json['privacy_settings']:
+            print(json)
+            if json['privacy_settings'].get('duels_invites_from') is not None:
                 privacy_settings.duels_invites_from = json['privacy_settings']['duels_invites_from']
-            if 'show_in_ratings' in json['privacy_settings']:
+            if json['privacy_settings'].get('show_in_ratings') is not None:
                 privacy_settings.show_in_ratings = json['privacy_settings']['show_in_ratings']
-            if 'profile_is_visible' in json['privacy_settings']:
+            if json['privacy_settings'].get('profile_is_visible') is not None:
                 privacy_settings.profile_is_visible = json['privacy_settings']['profile_is_visible']
 
             db.session.commit()
@@ -999,6 +1003,7 @@ def send_friendship():
                                                         token=token_data.token)
                             messaging.send(message)
                         except Exception as e:
+                            print(e)
                             db.session.delete(token_data)
 
                         db.session.add(notification)
@@ -1057,6 +1062,7 @@ def accept_friendship():
                                                         token=token_data.token)
                             messaging.send(message)
                         except Exception as e:
+                            print(e)
                             db.session.delete(token_data)
 
                     if db.session.query(Friendship).filter(db.or_(Friendship.user_id == user_id, Friendship.friend_id == user_id)).first() is None:
@@ -1112,6 +1118,7 @@ def reject_friendship():
                                                     token=token_data.token)
                         messaging.send(message)
                     except Exception as e:
+                        print(e)
                         db.session.delete(token_data)
 
                 friendship_request.delete()
@@ -1156,6 +1163,7 @@ def remove_friend():
                                                     token=token_data.token)
                         messaging.send(message)
                     except Exception as e:
+                        print(e)
                         db.session.delete(token_data)
 
                 friend.delete()
@@ -1203,6 +1211,7 @@ def cancel_friendship():
                                                     token=token_data.token)
                         messaging.send(message)
                     except Exception as e:
+                        print(e)
                         db.session.delete(token_data)
 
                 request_notification.delete()
@@ -1619,6 +1628,7 @@ def create_new_user(user_email, user_password, unregistered_user_data_json, avat
         db.session.add(new_user)
         db.session.flush()
 
+        print(unregistered_user_data_json)
         if "user_data" in unregistered_user_data_json:
             user_data = UserData(user_id=new_user.user_id, user_public_id=uuid.uuid1(), user_name=user_name,
                                  current_level=unregistered_user_data_json["user_data"]["current_level"],
