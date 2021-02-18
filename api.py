@@ -67,11 +67,6 @@ def get_chapter(number):
     return number_bounds(number, chapters)
 
 
-@app.route('/offline_data', methods=['GET'])
-def get_offline_data():
-    return json_200(offline_data)
-
-
 @app.route('/user_data', methods=['GET'])
 def get_user_data():
     try:
