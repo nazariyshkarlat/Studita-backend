@@ -1,7 +1,6 @@
 from db_config import Config
 from flask import Flask
 import os
-from pathlib import Path
 from werkzeug.serving import WSGIRequestHandler
 from flask_sqlalchemy import SQLAlchemy
 
